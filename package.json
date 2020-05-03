@@ -16,5 +16,8 @@
   "bugs": {
     "url": "https://github.com/kstewart83/hitchhiker/issues"
   },
-  "homepage": "https://github.com/kstewart83/hitchhiker#readme"
+  "homepage": "https://github.com/kstewart83/hitchhiker#readme",
+  "devDependencies": {
+    "typescript": "^3.8.3"
+  }
 }
