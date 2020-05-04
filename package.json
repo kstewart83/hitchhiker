@@ -8,12 +8,13 @@
     "build": "tsc",
     "format": "prettier --write \"src/**/*.ts\"",
     "lint": "tslint -p tsconfig.json",
-    "test": "jest --config jestconfig.json",
-    "prepare" : "npm run build",
-    "prepublishOnly" : "npm test && npm run lint",
-    "preversion" : "npm run lint",
-    "version" : "npm run format && git add -A src",
-    "postversion" : "git push && git push --tags"
+    "test": "jest --config jest.config.json",
+    "coverage": "jest --config jest.config.json --coverage",
+    "prepare": "npm run build",
+    "prepublishOnly": "npm test && npm run lint",
+    "preversion": "npm run lint",
+    "version": "npm run format && git add -A src",
+    "postversion": "git push && git push --tags"
   },
   "repository": {
     "type": "git",
@@ -21,7 +22,7 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "license": "UNLICENSE",
   "bugs": {
     "url": "https://github.com/kstewart83/hitchhiker/issues"
   },
@@ -29,6 +30,7 @@
   "devDependencies": {
     "@types/jest": "^25.2.1",
     "jest": "^25.5.4",
+    "pcg-random": "^1.0.0",
     "prettier": "^2.0.5",
     "ts-jest": "^25.4.0",
     "tslint": "^6.1.2",
