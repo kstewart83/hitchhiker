@@ -75,11 +75,7 @@ export default class BPlusTree<K, V> {
     }
   }
 
-  private getChildIndex(key: K | null, node: Node<K, V>): { index: number; found: boolean } {
-    if (key == null) {
-      throw new Error('Key is null');
-    }
-
+  private getChildIndex(key: K, node: Node<K, V>): { index: number; found: boolean } {
     if (node.children.length === 0) {
       return { index: 0, found: false };
     }
@@ -122,6 +118,10 @@ export default class BPlusTree<K, V> {
   private split(node: Node<K, V>) {
     const midIndex = Math.floor((node.children.length - (node.isLeaf ? 0 : 1)) / 2);
     const midKey = node.children[midIndex].key;
+
+    if (midKey == null) {
+      throw new Error('Key is null');
+    }
 
     const newNode: Node<K, V> = {
       isLeaf: node.isLeaf,
