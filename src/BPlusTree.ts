@@ -42,13 +42,16 @@ export default class BPlusTree<K, V> {
     const leaf = this.findLeaf(key, this.root);
     const { index, found } = this.getChildIndex(key, leaf);
 
+    // if key already exists, overwrite existing value
     if (found) {
       leaf.children[index].value = value;
       return;
     }
 
+    // otherwise, insert key/value pair based on the returned index
     leaf.children.splice(index, 0, { key, value });
 
+    // if adding a new item fills the node, split it
     if (leaf.children.length > this.branching - 1) {
       this.split(leaf);
     }
