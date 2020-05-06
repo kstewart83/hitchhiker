@@ -1,4 +1,4 @@
-import { Node, Child } from './Interfaces';
+import { Node, Child, IReferenceStorage } from './Interfaces';
 
 export default class BPlusTree<K, V> {
   /*** PUBLIC ***/
@@ -7,8 +7,9 @@ export default class BPlusTree<K, V> {
    * @param branching Branching factor for each node.
    * @param comparator Custom compartor for key values
    */
-  public constructor(branching: number, comparator?: (a: K, b: K) => number) {
+  public constructor(branching: number, storage: IReferenceStorage, comparator?: (a: K, b: K) => number) {
     this._branching = branching;
+    this._storage = storage;
     this._comparator = comparator;
     this._root = { isLeaf: true, parent: null, children: [] };
   }
@@ -62,6 +63,7 @@ export default class BPlusTree<K, V> {
   private _root: Node<K, V>;
   private _branching: number;
   private _comparator?: (a: K, b: K) => number;
+  private _storage?: IReferenceStorage;
 
   private findLeaf(key: K, node: Node<K, V>): Node<K, V> {
     if (node.isLeaf) {
