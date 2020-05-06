@@ -10,7 +10,7 @@ export default class BPlusTree<K, V> {
   public constructor(branching: number, comparator?: (a: K, b: K) => number) {
     this._branching = branching;
     this._comparator = comparator;
-    this._root = { isLeaf: true, children: [] };
+    this._root = { isLeaf: true, parent: null, children: [] };
   }
 
   /**
@@ -162,6 +162,7 @@ export default class BPlusTree<K, V> {
     } else {
       this._root = {
         isLeaf: false,
+        parent: null,
         children: [
           { key: midKey, node },
           { key: null, node: newNode },
