@@ -8,9 +8,9 @@ export default class BPlusTree<K, V> {
    * @param comparator Custom compartor for key values
    */
   public constructor(branching: number, comparator?: (a: K, b: K) => number) {
-    this.branching = branching;
-    this.comparator = comparator;
-    this.root = { isLeaf: true, children: [] };
+    this._branching = branching;
+    this._comparator = comparator;
+    this._root = { isLeaf: true, children: [] };
   }
 
   /**
@@ -21,7 +21,7 @@ export default class BPlusTree<K, V> {
    * if search key is not in tree
    */
   public find(key: K): V | null | undefined {
-    const leaf = this.findLeaf(key, this.root);
+    const leaf = this.findLeaf(key, this._root);
     const { index, found } = this.getChildIndex(key, leaf);
 
     if (found) {
@@ -39,7 +39,7 @@ export default class BPlusTree<K, V> {
    * @param value Value to add to the key in tree (can be null)
    */
   public add(key: K, value?: V) {
-    const leaf = this.findLeaf(key, this.root);
+    const leaf = this.findLeaf(key, this._root);
     const { index, found } = this.getChildIndex(key, leaf);
 
     // if key already exists, overwrite existing value
@@ -52,16 +52,16 @@ export default class BPlusTree<K, V> {
     leaf.children.splice(index, 0, { key, value });
 
     // if adding a new item fills the node, split it
-    if (leaf.children.length > this.branching - 1) {
+    if (leaf.children.length > this._branching - 1) {
       this.split(leaf);
     }
   }
 
   /*** PRIVATE ***/
 
-  root: Node<K, V>;
-  branching: number;
-  comparator?: (a: K, b: K) => number;
+  private _root: Node<K, V>;
+  private _branching: number;
+  private _comparator?: (a: K, b: K) => number;
 
   private findLeaf(key: K, node: Node<K, V>): Node<K, V> {
     if (node.isLeaf) {
@@ -156,18 +156,18 @@ export default class BPlusTree<K, V> {
       parent.children.splice(index, 0, { key: midKey, node });
       parent.children[index + 1].node = newNode;
 
-      if (parent.children.length > this.branching) {
+      if (parent.children.length > this._branching) {
         this.split(parent);
       }
     } else {
-      this.root = {
+      this._root = {
         children: [
           { key: midKey, node },
           { key: null, node: newNode },
         ],
       };
 
-      node.parent = newNode.parent = this.root;
+      node.parent = newNode.parent = this._root;
     }
   }
 
@@ -176,8 +176,8 @@ export default class BPlusTree<K, V> {
       throw new Error('Key is null');
     }
 
-    if (this.comparator) {
-      return this.comparator(a, b);
+    if (this._comparator) {
+      return this._comparator(a, b);
     } else {
       if (a < b) {
         return -1;
