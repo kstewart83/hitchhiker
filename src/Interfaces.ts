@@ -2,12 +2,14 @@ import ChildRef from './ChildRef';
 import NodeRef from './NodeRef';
 
 export interface Node<K, V> {
+  id: number;
   isLeaf: boolean;
-  parent: Node<K, V> | null;
+  // parent: Node<K, V> | null;
   children: Child<K, V>[];
 }
 
 export interface Child<K, V> {
+  id: number;
   key?: K | null;
   value?: V;
   node?: Node<K, V>;

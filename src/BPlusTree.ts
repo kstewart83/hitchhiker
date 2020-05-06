@@ -11,7 +11,8 @@ export default class BPlusTree<K, V> {
     this._branching = branching;
     this._storage = storage;
     this._comparator = comparator;
-    this._root = { isLeaf: true, parent: null, children: [] };
+    this._id = 0;
+    this._root = { id: this._id++, isLeaf: true, children: [] };
   }
 
   /**
@@ -22,7 +23,7 @@ export default class BPlusTree<K, V> {
    * if search key is not in tree
    */
   public find(key: K): V | null | undefined {
-    const leaf = this.findLeaf(key, this._root);
+    const { leaf } = this.findLeaf(key, [], this._root);
     const { index, found } = this.getChildIndex(key, leaf);
 
     if (found) {
@@ -40,7 +41,7 @@ export default class BPlusTree<K, V> {
    * @param value Value to add to the key in tree (can be null)
    */
   public add(key: K, value?: V) {
-    const leaf = this.findLeaf(key, this._root);
+    const { path, leaf } = this.findLeaf(key, [], this._root);
     const { index, found } = this.getChildIndex(key, leaf);
 
     // if key already exists, overwrite existing value
@@ -50,11 +51,11 @@ export default class BPlusTree<K, V> {
     }
 
     // otherwise, insert key/value pair based on the returned index
-    leaf.children.splice(index, 0, { key, value });
+    leaf.children.splice(index, 0, { id: this._id++, key, value });
 
     // if adding a new item fills the node, split it
     if (leaf.children.length > this._branching - 1) {
-      this.split(leaf);
+      this.split(path, leaf);
     }
   }
 
@@ -64,16 +65,17 @@ export default class BPlusTree<K, V> {
   private _branching: number;
   private _comparator?: (a: K, b: K) => number;
   private _storage?: IReferenceStorage;
+  private _id: number;
 
-  private findLeaf(key: K, node: Node<K, V>): Node<K, V> {
+  private findLeaf(key: K, path: Node<K, V>[], node: Node<K, V>): { path: Node<K, V>[]; leaf: Node<K, V> } {
     if (node.isLeaf) {
-      return node;
+      return { path, leaf: node };
     } else {
       const { index, found } = this.getChildIndex(key, node);
 
       const child = node.children[index + (found ? 1 : 0)];
       if (child.node) {
-        return this.findLeaf(key, child.node);
+        return this.findLeaf(key, path.concat(node), child.node);
       }
 
       throw new Error('Child has undefined child');
@@ -120,17 +122,22 @@ export default class BPlusTree<K, V> {
     }
   }
 
-  private split(node: Node<K, V>) {
+  private split(path: Node<K, V>[], node: Node<K, V>) {
     const midIndex = Math.floor((node.children.length - (node.isLeaf ? 0 : 1)) / 2);
     const midKey = node.children[midIndex].key;
+    let pathParent: Node<K, V> | null = path[path.length - 1];
+    if (pathParent === undefined) {
+      pathParent = null;
+    }
+    const parent = pathParent;
 
     if (midKey == null) {
       throw new Error('Key is null');
     }
 
     const newNode: Node<K, V> = {
+      id: this._id++,
       isLeaf: node.isLeaf,
-      parent: node.parent,
       children: node.children.slice(midIndex),
     };
 
@@ -141,37 +148,29 @@ export default class BPlusTree<K, V> {
       if (newNodeChild && newNodeChild.node) {
         const middleNode = newNodeChild.node;
 
-        node.children.push({ key: null, node: middleNode });
-
-        for (const child of newNode.children) {
-          if (child.node) {
-            child.node.parent = newNode;
-          }
-        }
+        node.children.push({ id: this._id++, key: null, node: middleNode });
       }
     }
 
-    const parent = node.parent;
     if (parent) {
       const { index } = this.getChildIndex(midKey, parent);
 
-      parent.children.splice(index, 0, { key: midKey, node });
+      parent.children.splice(index, 0, { id: this._id++, key: midKey, node });
       parent.children[index + 1].node = newNode;
 
       if (parent.children.length > this._branching) {
-        this.split(parent);
+        const newPath = [...path].slice(0, path.length - 1);
+        this.split(newPath, parent);
       }
     } else {
       this._root = {
+        id: this._id++,
         isLeaf: false,
-        parent: null,
         children: [
-          { key: midKey, node },
-          { key: null, node: newNode },
+          { id: this._id++, key: midKey, node },
+          { id: this._id++, key: null, node: newNode },
         ],
       };
-
-      node.parent = newNode.parent = this._root;
     }
   }
 
