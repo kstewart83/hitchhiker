@@ -161,6 +161,7 @@ export default class BPlusTree<K, V> {
       }
     } else {
       this._root = {
+        isLeaf: false,
         children: [
           { key: midKey, node },
           { key: null, node: newNode },
