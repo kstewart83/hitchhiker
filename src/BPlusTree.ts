@@ -173,9 +173,13 @@ export default class BPlusTree<K, V> {
     }
   }
 
-  private compareKey(a: K | null, b: K | null): number {
+  private compareKey(a?: K | null, b?: K | null): number {
     if (a == null || b == null) {
       throw new Error('Key is null');
+    }
+
+    if (a === undefined || b === undefined) {
+      throw new Error('Key is undefined');
     }
 
     if (this._comparator) {
