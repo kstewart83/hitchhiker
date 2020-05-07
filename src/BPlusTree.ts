@@ -7,7 +7,7 @@ export default class BPlusTree<K, V> {
    * @param branching Branching factor for each node.
    * @param comparator Custom compartor for key values
    */
-  public constructor(branching: number, storage: IReferenceStorage, comparator?: (a: K, b: K) => number) {
+  public constructor(branching: number, storage?: IReferenceStorage, comparator?: (a: K, b: K) => number) {
     this._branching = branching;
     this._storage = storage;
     this._comparator = comparator;
@@ -59,6 +59,10 @@ export default class BPlusTree<K, V> {
     }
   }
 
+  public toDOT(): string {
+    return this.toDOTInternal(this._root, '');
+  }
+
   /*** PRIVATE ***/
 
   private _root: Node<K, V>;
@@ -79,6 +83,29 @@ export default class BPlusTree<K, V> {
       }
 
       throw new Error('Child has undefined child');
+    }
+  }
+
+  private toDOTInternal(node: Node<K, V>, str: string): string {
+    if (node.isLeaf) {
+      node.children.forEach((c) => {
+        str += `n${node.id} [fillcolor="#ffddff", style=filled, label="N${node.id}"]\n`;
+        str += `n${node.id} -> n${c.id}\n`;
+        str += `n${c.id} [color=blue, label="${c.id}|[${c.key}, ${c.value}]"]\n`;
+      });
+      return str;
+    } else {
+      node.children.forEach((c) => {
+        if (c.node) {
+          str += `n${node.id} [fillcolor="#dddddd", style=filled, label="N${node.id}"]\n`;
+          str += `n${node.id} -> n${c.id}\n`;
+          str += `n${c.id} [fillcolor="#ffffdd", style=filled, label="N${c.id}|${c.key}"]\n`;
+          str += `n${c.id} -> n${c.node.id}\n`;
+          str = this.toDOTInternal(c.node, str);
+        }
+      });
+
+      return str;
     }
   }
 
