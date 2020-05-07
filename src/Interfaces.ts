@@ -33,7 +33,7 @@ export interface IChild<K, V> {
 }
 
 export interface IReferenceStorage {
-  new: () => number;
+  new (): number;
   get<T>(id: number): IReference<T> | undefined;
   put<T>(id: number, ref: IReference<T>): void;
 }
