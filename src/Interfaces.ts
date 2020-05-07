@@ -12,7 +12,6 @@ export interface Child<K, V> {
   id: number;
   key?: K | null;
   value?: V;
-  node?: Node<K, V>;
   nodeId?: number;
 }
 
