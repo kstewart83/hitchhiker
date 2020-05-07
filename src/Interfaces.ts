@@ -34,10 +34,14 @@ export interface IChild<K, V> {
   node?: NodeRef<K, V>;
 }
 
+export interface Metadata {
+  rootId: number;
+}
+
 export interface IReferenceStorage {
   newId(): number;
-  getMetadata(): any;
-  putMetadata(meta: any): void;
+  getMetadata(): Metadata;
+  putMetadata(meta: Metadata): void;
   get(id: number): any | undefined;
   put(id: number, ref: any): void;
 }

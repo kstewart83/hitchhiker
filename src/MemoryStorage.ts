@@ -1,4 +1,4 @@
-import { IReferenceStorage, IReference } from './Interfaces';
+import { IReferenceStorage, IReference, Metadata } from './Interfaces';
 
 export class MemoryStorage implements IReferenceStorage {
   /*** PUBLIC ***/
@@ -12,11 +12,11 @@ export class MemoryStorage implements IReferenceStorage {
     return this._id++;
   }
 
-  putMetadata(meta: any): void {
+  putMetadata(meta: Metadata): void {
     this._data.meta = meta;
   }
 
-  getMetadata(): any {
+  getMetadata(): Metadata {
     return this._data.meta;
   }
 

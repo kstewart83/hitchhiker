@@ -1,4 +1,4 @@
-import { Node, Child, IReferenceStorage } from './Interfaces';
+import { Node, Child, IReferenceStorage, Metadata } from './Interfaces';
 import MemoryStorage from './MemoryStorage';
 
 export default class BPlusTree<K, V> {
@@ -16,11 +16,17 @@ export default class BPlusTree<K, V> {
       this._storage = new MemoryStorage();
     }
     this._comparator = comparator;
-    this._root = { id: this._storage.newId(), isLeaf: true, children: [], childrenId: [] };
-    this._storage.put(this._root.id, this._root);
-    this._storage.putMetadata({
-      rootId: this._root.id,
-    });
+    this._metadata = this._storage.getMetadata();
+    if (this._metadata) {
+      this._root = this._storage.get(this._metadata.rootId);
+    } else {
+      this._root = { id: this._storage.newId(), isLeaf: true, children: [], childrenId: [] };
+      this._storage.put(this._root.id, this._root);
+      this._metadata = {
+        rootId: this._root.id,
+      };
+      this._storage.putMetadata(this._metadata);
+    }
   }
 
   /**
@@ -84,6 +90,7 @@ export default class BPlusTree<K, V> {
   private _branching: number;
   private _comparator?: (a: K, b: K) => number;
   private _storage: IReferenceStorage;
+  private _metadata: Metadata;
 
   private findLeaf(key: K, path: Node<K, V>[], node: Node<K, V>): { path: Node<K, V>[]; leaf: Node<K, V> } {
     if (node.isLeaf) {
