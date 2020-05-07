@@ -16,8 +16,7 @@ export default class BPlusTree<K, V> {
       this._storage = new MemoryStorage();
     }
     this._comparator = comparator;
-    this._id = 0;
-    this._root = { id: this._id++, isLeaf: true, children: [], childrenId: [] };
+    this._root = { id: this._storage.newId(), isLeaf: true, children: [], childrenId: [] };
     this._storage.put(this._root.id, this._root);
     this._storage.putMetadata({
       rootId: this._root.id,
@@ -61,7 +60,7 @@ export default class BPlusTree<K, V> {
     }
 
     // otherwise, insert key/value pair based on the returned index
-    const newChild = { id: this._id++, key, value };
+    const newChild = { id: this._storage.newId(), key, value };
     leaf.children.splice(index, 0, newChild);
     leaf.childrenId.splice(index, 0, newChild.id);
     this._storage.put(newChild.id, newChild);
@@ -85,7 +84,6 @@ export default class BPlusTree<K, V> {
   private _branching: number;
   private _comparator?: (a: K, b: K) => number;
   private _storage: IReferenceStorage;
-  private _id: number;
 
   private findLeaf(key: K, path: Node<K, V>[], node: Node<K, V>): { path: Node<K, V>[]; leaf: Node<K, V> } {
     if (node.isLeaf) {
@@ -179,7 +177,7 @@ export default class BPlusTree<K, V> {
     }
 
     const newNode: Node<K, V> = {
-      id: this._id++,
+      id: this._storage.newId(),
       isLeaf: node.isLeaf,
       children: node.children.slice(midIndex),
       childrenId: node.childrenId.slice(midIndex),
@@ -193,7 +191,7 @@ export default class BPlusTree<K, V> {
       if (newNodeChild && newNodeChild.node) {
         const middleNode = newNodeChild.node;
 
-        const newChild = { id: this._id++, key: null, node: middleNode, nodeId: middleNode.id };
+        const newChild = { id: this._storage.newId(), key: null, node: middleNode, nodeId: middleNode.id };
         node.children.push(newChild);
         this._storage.put(newChild.id, newChild);
       }
@@ -202,7 +200,7 @@ export default class BPlusTree<K, V> {
     if (parent) {
       const { index } = this.getChildIndex(midKey, parent);
 
-      const newChild = { id: this._id++, key: midKey, node, nodeId: node.id };
+      const newChild = { id: this._storage.newId(), key: midKey, node, nodeId: node.id };
       parent.children.splice(index, 0, newChild);
       parent.children[index + 1].node = newNode;
       this._storage.put(newChild.id, newChild);
@@ -213,10 +211,10 @@ export default class BPlusTree<K, V> {
         this.split(newPath, parent);
       }
     } else {
-      const newLeft = { id: this._id++, key: midKey, node, nodeId: node.id };
-      const newRight = { id: this._id++, key: null, node: newNode, nodeId: newNode.id };
+      const newLeft = { id: this._storage.newId(), key: midKey, node, nodeId: node.id };
+      const newRight = { id: this._storage.newId(), key: null, node: newNode, nodeId: newNode.id };
       this._root = {
-        id: this._id++,
+        id: this._storage.newId(),
         isLeaf: false,
         children: [newLeft, newRight],
         childrenId: [newLeft.id, newRight.id],
