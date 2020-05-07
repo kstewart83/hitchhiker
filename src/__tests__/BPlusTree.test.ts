@@ -93,16 +93,32 @@ test('Fill root node up to branching factor plus 1', () => {
   }
 });
 
-test('Insert 1000 random key value pairs', () => {
+test('Insert 1000 sequential keys with random value pairs', () => {
   const branchingFactor = 5;
+  const total = 1000;
   let rng = new PcgRandom(42);
   const test = new BPlusTree<number, number>(branchingFactor);
-  for (let i = 0; i < 1000; i++) {
+  for (let i = 0; i < total; i++) {
+    test.add(i, rng.integer());
+  }
+
+  rng = new PcgRandom(42);
+  for (let i = 0; i < total; i++) {
+    expect(test.find(i)).toBe(rng.integer());
+  }
+});
+
+test('Insert 1000 random key value pairs', () => {
+  const branchingFactor = 5;
+  const total = 100;
+  let rng = new PcgRandom(42);
+  const test = new BPlusTree<number, number>(branchingFactor);
+  for (let i = 0; i < total; i++) {
     test.add(rng.integer(), rng.integer());
   }
 
   rng = new PcgRandom(42);
-  for (let i = 0; i < 1000; i++) {
+  for (let i = 0; i < total; i++) {
     expect(test.find(rng.integer())).toBe(rng.integer());
   }
 });
