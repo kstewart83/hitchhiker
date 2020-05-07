@@ -15,9 +15,9 @@ export interface Child<K, V> {
 }
 
 export interface IReference<T> {
-  id: () => number;
-  serialize: () => Buffer;
-  deserialize: (buffer: Buffer) => T;
+  id(): number;
+  serialize(): Buffer;
+  deserialize(buffer: Buffer): T;
 }
 
 export interface INode<K, V> {
