@@ -5,6 +5,7 @@ export interface Node<K, V> {
   id: number;
   isLeaf: boolean;
   children: Child<K, V>[];
+  childrenId: number[];
 }
 
 export interface Child<K, V> {
@@ -12,6 +13,7 @@ export interface Child<K, V> {
   key?: K | null;
   value?: V;
   node?: Node<K, V>;
+  nodeId?: number;
 }
 
 export interface IReference<T> {
@@ -33,7 +35,9 @@ export interface IChild<K, V> {
 }
 
 export interface IReferenceStorage {
-  new (): number;
-  get<T>(id: number): IReference<T> | undefined;
-  put<T>(id: number, ref: IReference<T>): void;
+  newId(): number;
+  getMetadata(): any;
+  putMetadata(meta: any): void;
+  get(id: number): any | undefined;
+  put(id: number, ref: any): void;
 }

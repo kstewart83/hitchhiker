@@ -1,4 +1,5 @@
 import { Node, Child, IReferenceStorage } from './Interfaces';
+import MemoryStorage from './MemoryStorage';
 
 export default class BPlusTree<K, V> {
   /*** PUBLIC ***/
@@ -9,10 +10,18 @@ export default class BPlusTree<K, V> {
    */
   public constructor(branching: number, storage?: IReferenceStorage, comparator?: (a: K, b: K) => number) {
     this._branching = branching;
-    this._storage = storage;
+    if (storage) {
+      this._storage = storage;
+    } else {
+      this._storage = new MemoryStorage();
+    }
     this._comparator = comparator;
     this._id = 0;
-    this._root = { id: this._id++, isLeaf: true, children: [] };
+    this._root = { id: this._id++, isLeaf: true, children: [], childrenId: [] };
+    this._storage.put(this._root.id, this._root);
+    this._storage.putMetadata({
+      rootId: this._root.id,
+    });
   }
 
   /**
@@ -47,11 +56,15 @@ export default class BPlusTree<K, V> {
     // if key already exists, overwrite existing value
     if (found) {
       leaf.children[index].value = value;
+      this._storage.put(leaf.id, leaf);
       return;
     }
 
     // otherwise, insert key/value pair based on the returned index
-    leaf.children.splice(index, 0, { id: this._id++, key, value });
+    const newChild = { id: this._id++, key, value };
+    leaf.children.splice(index, 0, newChild);
+    leaf.childrenId.splice(index, 0, newChild.id);
+    this._storage.put(newChild.id, newChild);
 
     // if adding a new item fills the node, split it
     if (leaf.children.length > this._branching - 1) {
@@ -71,7 +84,7 @@ export default class BPlusTree<K, V> {
   private _root: Node<K, V>;
   private _branching: number;
   private _comparator?: (a: K, b: K) => number;
-  private _storage?: IReferenceStorage;
+  private _storage: IReferenceStorage;
   private _id: number;
 
   private findLeaf(key: K, path: Node<K, V>[], node: Node<K, V>): { path: Node<K, V>[]; leaf: Node<K, V> } {
@@ -169,38 +182,51 @@ export default class BPlusTree<K, V> {
       id: this._id++,
       isLeaf: node.isLeaf,
       children: node.children.slice(midIndex),
+      childrenId: node.childrenId.slice(midIndex),
     };
 
     node.children = node.children.slice(0, midIndex);
+    node.childrenId = node.childrenId.slice(0, midIndex);
 
     if (!node.isLeaf) {
       const newNodeChild = newNode.children.shift();
       if (newNodeChild && newNodeChild.node) {
         const middleNode = newNodeChild.node;
 
-        node.children.push({ id: this._id++, key: null, node: middleNode });
+        const newChild = { id: this._id++, key: null, node: middleNode, nodeId: middleNode.id };
+        node.children.push(newChild);
+        this._storage.put(newChild.id, newChild);
       }
     }
 
     if (parent) {
       const { index } = this.getChildIndex(midKey, parent);
 
-      parent.children.splice(index, 0, { id: this._id++, key: midKey, node });
+      const newChild = { id: this._id++, key: midKey, node, nodeId: node.id };
+      parent.children.splice(index, 0, newChild);
       parent.children[index + 1].node = newNode;
+      this._storage.put(newChild.id, newChild);
+      this._storage.put(newNode.id, newNode);
 
       if (parent.children.length > this._branching) {
         const newPath = [...path].slice(0, path.length - 1);
         this.split(newPath, parent);
       }
     } else {
+      const newLeft = { id: this._id++, key: midKey, node, nodeId: node.id };
+      const newRight = { id: this._id++, key: null, node: newNode, nodeId: newNode.id };
       this._root = {
         id: this._id++,
         isLeaf: false,
-        children: [
-          { id: this._id++, key: midKey, node },
-          { id: this._id++, key: null, node: newNode },
-        ],
+        children: [newLeft, newRight],
+        childrenId: [newLeft.id, newRight.id],
       };
+      this._storage.put(newLeft.id, newLeft);
+      this._storage.put(newRight.id, newRight);
+      this._storage.put(this._root.id, this._root);
+      this._storage.putMetadata({
+        rootId: this._root.id,
+      });
     }
   }
 
