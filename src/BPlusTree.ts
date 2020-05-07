@@ -59,6 +59,9 @@ export default class BPlusTree<K, V> {
     }
   }
 
+  /**
+   * Convert tree to DOT representation
+   */
   public toDOT(): string {
     return this.toDOTInternal(this._root, '');
   }
