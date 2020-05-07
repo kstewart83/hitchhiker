@@ -94,7 +94,7 @@ export default class BPlusTree<K, V> {
       node.children.forEach((c) => {
         str += `n${node.id} [fillcolor="#ffddff", style=filled, label="N${node.id}"]\n`;
         str += `n${node.id} -> n${c.id}\n`;
-        str += `n${c.id} [color=blue, label="${c.id}|[${c.key}, ${c.value}]"]\n`;
+        str += `n${c.id} [color=blue, label="N${c.id}|[${c.key}, ${c.value}]"]\n`;
       });
       return str;
     } else {
