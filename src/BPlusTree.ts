@@ -43,7 +43,7 @@ export default class BPlusTree<K, V> {
     if (found) {
       return leaf.children[index].value;
     } else {
-      return null;
+      return undefined;
     }
   }
 
@@ -98,10 +98,11 @@ export default class BPlusTree<K, V> {
     } else {
       const { index, found } = this.getChildIndex(key, node);
 
-      const child = node.children[index + (found ? 1 : 0)];
-      // const childNode = this._storage.get(child.id);
-      if (child.node) {
-        return this.findLeaf(key, path.concat(node), child.node);
+      const childId = node.childrenId[index + (found ? 1 : 0)];
+      const child = this._storage.get(childId);
+      if (child.nodeId !== undefined) {
+        const childNode = this._storage.get(child.nodeId);
+        return this.findLeaf(key, path.concat(node), childNode);
       }
 
       throw new Error('Child has undefined child');
@@ -198,14 +199,16 @@ export default class BPlusTree<K, V> {
     if (!node.isLeaf) {
       const newNodeChild = newNode.children.shift();
       newNode.childrenId.shift();
-      if (newNodeChild && newNodeChild.node) {
-        const middleNode = newNodeChild.node;
+      if (newNodeChild && newNodeChild.nodeId) {
+        const middleNode = this._storage.get(newNodeChild.nodeId);
 
         const newChild = { id: this._storage.newId(), key: null, node: middleNode, nodeId: middleNode.id };
         node.children.push(newChild);
         node.childrenId.push(newChild.id);
+        this._storage.put(node.id, node);
         this._storage.put(newChild.id, newChild);
       }
+      this._storage.put(newNode.id, newNode);
     }
 
     if (parent) {
@@ -214,8 +217,9 @@ export default class BPlusTree<K, V> {
       const newChild = { id: this._storage.newId(), key: midKey, node, nodeId: node.id };
       parent.children.splice(index, 0, newChild);
       parent.childrenId.splice(index, 0, newChild.id);
-      parent.children[index + 1].node = newNode;
+      parent.children[index + 1].nodeId = newNode.id;
 
+      this._storage.put(parent.id, parent);
       this._storage.put(newChild.id, newChild);
       this._storage.put(newNode.id, newNode);
 
@@ -232,6 +236,7 @@ export default class BPlusTree<K, V> {
         children: [newLeft, newRight],
         childrenId: [newLeft.id, newRight.id],
       };
+      this._storage.put(newNode.id, newNode);
       this._storage.put(newLeft.id, newLeft);
       this._storage.put(newRight.id, newRight);
       this._storage.put(this._root.id, this._root);
