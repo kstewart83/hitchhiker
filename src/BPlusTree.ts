@@ -1,4 +1,4 @@
-import { Node, Child, IReferenceStorage, Metadata, Pointer, Datum } from './Interfaces';
+import { Node, Child, IReferenceStorage, Metadata } from './Interfaces';
 import MemoryStorage from './MemoryStorage';
 
 export default class BPlusTree<K, V> {
@@ -20,7 +20,7 @@ export default class BPlusTree<K, V> {
     if (this._metadata) {
       this._root = this._storage.get(this._metadata.rootId);
     } else {
-      this._root = { id: this._storage.newId(), isLeaf: true, childrenId: [], data: [] };
+      this._root = { id: this._storage.newId(), isLeaf: true, childrenId: [], entries: [] };
       this._storage.put(this._root.id, this._root);
       this._metadata = {
         rootId: this._root.id,
@@ -41,7 +41,7 @@ export default class BPlusTree<K, V> {
     const { index, found } = this.getChildIndex(key, leaf);
 
     if (found) {
-      return leaf.data[index].value;
+      return leaf.entries[index].value;
     } else {
       return undefined;
     }
@@ -60,18 +60,18 @@ export default class BPlusTree<K, V> {
 
     // if key already exists, overwrite existing value
     if (found) {
-      leaf.data[index].value = value;
+      leaf.entries[index].value = value;
       this._storage.put(leaf.id, leaf);
       return;
     }
 
     // otherwise, insert key/value pair based on the returned index
     const newChild = { id: this._storage.newId(), key, value };
-    leaf.data.splice(index, 0, { key: newChild.key, value: newChild.value });
+    leaf.entries.splice(index, 0, { key: newChild.key, value: newChild.value });
     this._storage.put(leaf.id, leaf);
 
     // if adding a new item fills the node, split it
-    if (leaf.data.length > this._branching - 1) {
+    if (leaf.entries.length > this._branching - 1) {
       this.split(path, leaf);
     }
   }
@@ -160,12 +160,12 @@ export default class BPlusTree<K, V> {
     let comparison: number;
     let index: number;
     if (node.isLeaf) {
-      if (node.data.length === 0) {
+      if (node.entries.length === 0) {
         return { index: 0, found: false };
       }
 
-      index = this.getChildIndexBinarySearch(key, node, 0, node.data.length - 1);
-      comparison = this.compareKey(key, node.data[index].key);
+      index = this.getChildIndexBinarySearch(key, node, 0, node.entries.length - 1);
+      comparison = this.compareKey(key, node.entries[index].key);
     } else {
       if (node.childrenId.length === 0) {
         return { index: 0, found: false };
@@ -193,7 +193,7 @@ export default class BPlusTree<K, V> {
     const mid = Math.floor((start + end) / 2);
     let otherKey;
     if (node.isLeaf) {
-      otherKey = node.data[mid].key;
+      otherKey = node.entries[mid].key;
     } else {
       otherKey = this._storage.get(node.childrenId[mid].nodeId).key;
     }
@@ -212,8 +212,8 @@ export default class BPlusTree<K, V> {
     let midKey: K;
     let midIndex: number;
     if (node.isLeaf) {
-      midIndex = Math.floor((node.data.length - (node.isLeaf ? 0 : 1)) / 2);
-      midKey = node.data[midIndex].key;
+      midIndex = Math.floor((node.entries.length - (node.isLeaf ? 0 : 1)) / 2);
+      midKey = node.entries[midIndex].key;
     } else {
       midIndex = Math.floor((node.childrenId.length - (node.isLeaf ? 0 : 1)) / 2);
       const midChild = this._storage.get(node.childrenId[midIndex].nodeId);
@@ -234,11 +234,11 @@ export default class BPlusTree<K, V> {
       id: this._storage.newId(),
       isLeaf: node.isLeaf,
       childrenId: node.childrenId.slice(midIndex),
-      data: node.data.slice(midIndex),
+      entries: node.entries.slice(midIndex),
     };
 
     node.childrenId = node.childrenId.slice(0, midIndex);
-    node.data = node.data.slice(0, midIndex);
+    node.entries = node.entries.slice(0, midIndex);
 
     if (!node.isLeaf) {
       const newNodeChildId = newNode.childrenId.shift();
@@ -284,7 +284,7 @@ export default class BPlusTree<K, V> {
           { key: newLeft.key, nodeId: newLeft.id },
           { key: newRight.key, nodeId: newRight.id },
         ],
-        data: [],
+        entries: [],
       };
       this._storage.put(newNode.id, newNode);
       this._storage.put(newLeft.id, newLeft);

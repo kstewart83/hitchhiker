@@ -5,7 +5,7 @@ export interface Node<K, V> {
   id: number;
   isLeaf: boolean;
   childrenId: Pointer<K>[];
-  data: Datum<K, V>[];
+  entries: Entry<K, V>[];
 }
 
 export interface Child<K, V> {
@@ -15,7 +15,7 @@ export interface Child<K, V> {
   nodeId?: number;
 }
 
-export interface Datum<K, V> {
+export interface Entry<K, V> {
   key: K;
   value?: V;
 }
