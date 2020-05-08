@@ -4,7 +4,6 @@ import NodeRef from './NodeRef';
 export interface Node<K, V> {
   id: number;
   isLeaf: boolean;
-  children: Child<K, V>[];
   childrenId: number[];
 }
 

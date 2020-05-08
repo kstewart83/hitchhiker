@@ -20,7 +20,7 @@ export default class BPlusTree<K, V> {
     if (this._metadata) {
       this._root = this._storage.get(this._metadata.rootId);
     } else {
-      this._root = { id: this._storage.newId(), isLeaf: true, children: [], childrenId: [] };
+      this._root = { id: this._storage.newId(), isLeaf: true, childrenId: [] };
       this._storage.put(this._root.id, this._root);
       this._metadata = {
         rootId: this._root.id,
@@ -61,14 +61,14 @@ export default class BPlusTree<K, V> {
 
     // if key already exists, overwrite existing value
     if (found) {
-      leaf.children[index].value = value;
-      this._storage.put(leaf.id, leaf);
+      const leafChild = this._storage.get(leaf.childrenId[index]);
+      leafChild.value = value;
+      this._storage.put(leafChild.id, leafChild);
       return;
     }
 
     // otherwise, insert key/value pair based on the returned index
     const newChild = { id: this._storage.newId(), key, value };
-    leaf.children.splice(index, 0, newChild);
     leaf.childrenId.splice(index, 0, newChild.id);
     this._storage.put(newChild.id, newChild);
 
@@ -180,7 +180,8 @@ export default class BPlusTree<K, V> {
 
   private split(path: Node<K, V>[], node: Node<K, V>) {
     const midIndex = Math.floor((node.childrenId.length - (node.isLeaf ? 0 : 1)) / 2);
-    const midKey = node.children[midIndex].key;
+    const midChild = this._storage.get(node.childrenId[midIndex]);
+    const midKey = midChild.key;
     let pathParent: Node<K, V> | null = path[path.length - 1];
     if (pathParent === undefined) {
       pathParent = null;
@@ -194,21 +195,21 @@ export default class BPlusTree<K, V> {
     const newNode: Node<K, V> = {
       id: this._storage.newId(),
       isLeaf: node.isLeaf,
-      children: node.children.slice(midIndex),
       childrenId: node.childrenId.slice(midIndex),
     };
 
-    node.children = node.children.slice(0, midIndex);
     node.childrenId = node.childrenId.slice(0, midIndex);
 
     if (!node.isLeaf) {
-      const newNodeChild = newNode.children.shift();
-      newNode.childrenId.shift();
+      const newNodeChildId = newNode.childrenId.shift();
+      if (newNodeChildId === undefined) {
+        throw new Error('Trying to split empty leaf');
+      }
+      const newNodeChild = this._storage.get(newNodeChildId);
       if (newNodeChild && newNodeChild.nodeId) {
         const middleNode = this._storage.get(newNodeChild.nodeId);
 
         const newChild = { id: this._storage.newId(), key: null, node: middleNode, nodeId: middleNode.id };
-        node.children.push(newChild);
         node.childrenId.push(newChild.id);
         this._storage.put(node.id, node);
         this._storage.put(newChild.id, newChild);
@@ -220,9 +221,10 @@ export default class BPlusTree<K, V> {
       const { index } = this.getChildIndex(midKey, parent);
 
       const newChild = { id: this._storage.newId(), key: midKey, node, nodeId: node.id };
-      parent.children.splice(index, 0, newChild);
       parent.childrenId.splice(index, 0, newChild.id);
-      parent.children[index + 1].nodeId = newNode.id;
+
+      const other = this._storage.get(parent.childrenId[index + 1]) as Child<K, V>;
+      other.nodeId = newNode.id;
 
       this._storage.put(parent.id, parent);
       this._storage.put(newChild.id, newChild);
@@ -238,7 +240,6 @@ export default class BPlusTree<K, V> {
       this._root = {
         id: this._storage.newId(),
         isLeaf: false,
-        children: [newLeft, newRight],
         childrenId: [newLeft.id, newRight.id],
       };
       this._storage.put(newNode.id, newNode);

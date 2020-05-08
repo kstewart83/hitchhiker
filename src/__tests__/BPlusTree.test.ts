@@ -93,6 +93,16 @@ test('Fill root node up to branching factor plus 1', () => {
   }
 });
 
+test('Insert 20 sequential keys with sequential value pairs, immediate check', () => {
+  const branchingFactor = 5;
+  const total = 20;
+  const test = new BPlusTree<number, number>(branchingFactor);
+  for (let i = 0; i < total; i++) {
+    test.add(i, i);
+    expect(test.find(i)).toBe(i);
+  }
+});
+
 test('Insert 1000 sequential keys with random value pairs', () => {
   const branchingFactor = 5;
   const total = 1000;
