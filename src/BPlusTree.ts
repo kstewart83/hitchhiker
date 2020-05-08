@@ -20,7 +20,7 @@ export default class BPlusTree<K, V> {
     if (this._metadata) {
       this._root = this._storage.get(this._metadata.rootId);
     } else {
-      this._root = { id: this._storage.newId(), isLeaf: true, childrenId: [] };
+      this._root = { id: this._storage.newId(), isLeaf: true, childrenId: [], data: [] };
       this._storage.put(this._root.id, this._root);
       this._metadata = {
         rootId: this._root.id,
@@ -70,6 +70,7 @@ export default class BPlusTree<K, V> {
     // otherwise, insert key/value pair based on the returned index
     const newChild = { id: this._storage.newId(), key, value };
     leaf.childrenId.splice(index, 0, { key: newChild.key, nodeId: newChild.id });
+    leaf.data.splice(index, 0, newChild);
     this._storage.put(newChild.id, newChild);
 
     // if adding a new item fills the node, split it
@@ -203,6 +204,7 @@ export default class BPlusTree<K, V> {
       id: this._storage.newId(),
       isLeaf: node.isLeaf,
       childrenId: node.childrenId.slice(midIndex),
+      data: [],
     };
 
     node.childrenId = node.childrenId.slice(0, midIndex);
@@ -251,6 +253,7 @@ export default class BPlusTree<K, V> {
           { key: newLeft.key, nodeId: newLeft.id },
           { key: newRight.key, nodeId: newRight.id },
         ],
+        data: [],
       };
       this._storage.put(newNode.id, newNode);
       this._storage.put(newLeft.id, newLeft);
