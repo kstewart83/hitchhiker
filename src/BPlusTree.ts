@@ -72,7 +72,7 @@ export default class BPlusTree<K, V> {
     this._storage.put(newChild.id, newChild);
 
     // if adding a new item fills the node, split it
-    if (leaf.children.length > this._branching - 1) {
+    if (leaf.childrenId.length > this._branching - 1) {
       this.split(path, leaf);
     }
   }
@@ -134,11 +134,11 @@ export default class BPlusTree<K, V> {
   }
 
   private getChildIndex(key: K, node: Node<K, V>): { index: number; found: boolean } {
-    if (node.children.length === 0) {
+    if (node.childrenId.length === 0) {
       return { index: 0, found: false };
     }
 
-    let end = node.children.length - 1;
+    let end = node.childrenId.length - 1;
 
     if (!node.isLeaf) {
       end--;
@@ -174,7 +174,7 @@ export default class BPlusTree<K, V> {
   }
 
   private split(path: Node<K, V>[], node: Node<K, V>) {
-    const midIndex = Math.floor((node.children.length - (node.isLeaf ? 0 : 1)) / 2);
+    const midIndex = Math.floor((node.childrenId.length - (node.isLeaf ? 0 : 1)) / 2);
     const midKey = node.children[midIndex].key;
     let pathParent: Node<K, V> | null = path[path.length - 1];
     if (pathParent === undefined) {
@@ -223,7 +223,7 @@ export default class BPlusTree<K, V> {
       this._storage.put(newChild.id, newChild);
       this._storage.put(newNode.id, newNode);
 
-      if (parent.children.length > this._branching) {
+      if (parent.childrenId.length > this._branching) {
         const newPath = [...path].slice(0, path.length - 1);
         this.split(newPath, parent);
       }
