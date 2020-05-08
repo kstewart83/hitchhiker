@@ -43,7 +43,6 @@ export default class BPlusTree<K, V> {
     if (found) {
       const leafChild = this._storage.get(leaf.childrenId[index]);
       return leafChild.value;
-      // return leaf.children[index].value;
     } else {
       return undefined;
     }
