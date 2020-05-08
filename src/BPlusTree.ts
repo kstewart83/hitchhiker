@@ -239,7 +239,7 @@ export default class BPlusTree<K, V> {
     if (!node.isLeaf) {
       const newNodeChildId = newNode.pointers.shift();
       if (newNodeChildId === undefined) {
-        throw new Error('Trying to split empty leaf');
+        throw new Error('Trying to split empty internal node');
       }
       const newNodeChild = this._storage.get(newNodeChildId.nodeId);
       if (newNodeChild) {
