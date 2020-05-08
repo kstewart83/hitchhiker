@@ -20,18 +20,6 @@ export interface IReference<T> {
   deserialize(buffer: Buffer): T;
 }
 
-export interface INode<K, V> {
-  isLeaf: boolean;
-  parent: NodeRef<K, V> | null;
-  children: ChildRef<K, V>[];
-}
-
-export interface IChild<K, V> {
-  key?: K | null;
-  value?: V;
-  node?: NodeRef<K, V>;
-}
-
 export interface Metadata {
   rootId: number;
 }
