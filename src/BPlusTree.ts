@@ -1,4 +1,4 @@
-import { Node, Child, IReferenceStorage, Metadata } from './Interfaces';
+import { Node, Child, IReferenceStorage, Metadata, Pointer } from './Interfaces';
 import MemoryStorage from './MemoryStorage';
 
 export default class BPlusTree<K, V> {
@@ -41,7 +41,7 @@ export default class BPlusTree<K, V> {
     const { index, found } = this.getChildIndex(key, leaf);
 
     if (found) {
-      const leafChild = this._storage.get(leaf.childrenId[index]);
+      const leafChild = this._storage.get(leaf.childrenId[index].nodeId);
       return leafChild.value;
     } else {
       return undefined;
@@ -61,7 +61,7 @@ export default class BPlusTree<K, V> {
 
     // if key already exists, overwrite existing value
     if (found) {
-      const leafChild = this._storage.get(leaf.childrenId[index]);
+      const leafChild = this._storage.get(leaf.childrenId[index].nodeId);
       leafChild.value = value;
       this._storage.put(leafChild.id, leafChild);
       return;
@@ -69,7 +69,7 @@ export default class BPlusTree<K, V> {
 
     // otherwise, insert key/value pair based on the returned index
     const newChild = { id: this._storage.newId(), key, value };
-    leaf.childrenId.splice(index, 0, newChild.id);
+    leaf.childrenId.splice(index, 0, { key: newChild.key, nodeId: newChild.id });
     this._storage.put(newChild.id, newChild);
 
     // if adding a new item fills the node, split it
@@ -100,7 +100,7 @@ export default class BPlusTree<K, V> {
       const { index, found } = this.getChildIndex(key, node);
 
       const childId = node.childrenId[index + (found ? 1 : 0)];
-      const child = this._storage.get(childId);
+      const child = this._storage.get(childId.nodeId);
       if (child.nodeId !== undefined) {
         const childNode = this._storage.get(child.nodeId);
         return this.findLeaf(key, path.concat(node), childNode);
@@ -110,30 +110,37 @@ export default class BPlusTree<K, V> {
     }
   }
 
-  private toDOTInternal(node: Node<K, V>, str: string): string {
-    if (node.isLeaf) {
-      node.childrenId.forEach((cId) => {
-        const c = this._storage.get(cId);
-        str += `n${node.id} [fillcolor="#ffddff", style=filled, label="N${node.id}"]\n`;
-        str += `n${node.id} -> n${c.id}\n`;
-        str += `n${c.id} [color=blue, label="N${c.id}|[${c.key}, ${c.value}]"]\n`;
-      });
-      return str;
-    } else {
-      node.childrenId.forEach((cId) => {
-        const c = this._storage.get(cId);
-        if (c.nodeId) {
-          str += `n${node.id} [fillcolor="#dddddd", style=filled, label="N${node.id}"]\n`;
-          str += `n${node.id} -> n${c.id}\n`;
-          str += `n${c.id} [fillcolor="#ffffdd", style=filled, label="N${c.id}|${c.key}"]\n`;
-          str += `n${c.id} -> n${c.nodeId}\n`;
-          const childNode = this._storage.get(c.id);
-          str = this.toDOTInternal(childNode, str);
-        }
-      });
-
+  private toDOTInternal(node: any, str: string): string {
+    if (node.childrenId === undefined && node.nodeId === undefined) {
+      str += `n${node.id} [color=blue, label="<n>C${node.id}|[${node.key},${node.value}]"]\n`;
       return str;
     }
+
+    if (node.nodeId !== undefined) {
+      str += `n${node.id} [fillcolor="#dddddd", style=filled, label="<n>C${node.id}"]\n`;
+      str += `n${node.id} -> n${node.nodeId}\n`;
+      const next = this._storage.get(node.nodeId);
+      str = this.toDOTInternal(next, str);
+    }
+
+    if (node.childrenId !== undefined) {
+      let fieldStr = '';
+      let i = 0;
+      node.childrenId.forEach((cId: any) => {
+        const child = this._storage.get(cId.nodeId);
+        if (child.nodeId) {
+          str += `n${node.id}:c${i} -> n${child.nodeId} [style=dotted]\n`;
+        }
+        str += `n${node.id}:c${i} -> n${cId.nodeId}\n`;
+        fieldStr += `|<c${i++}>${cId.key == null ? '*' : cId.key}`;
+        str = this.toDOTInternal(child, str);
+      });
+      str += `n${node.id} [fillcolor="${node.isLeaf ? '#ffddff' : '#ffffdd'}", style=filled, label="<n>N${
+        node.id
+      }${fieldStr}"]\n`;
+    }
+
+    return str;
   }
 
   private getChildIndex(key: K, node: Node<K, V>): { index: number; found: boolean } {
@@ -148,7 +155,7 @@ export default class BPlusTree<K, V> {
     }
 
     const index = this.getChildIndexBinarySearch(key, node.childrenId, 0, end);
-    const nodeChild = this._storage.get(node.childrenId[index]);
+    const nodeChild = this._storage.get(node.childrenId[index].nodeId);
     const comparison = this.compareKey(key, nodeChild.key);
 
     if (comparison === 0) {
@@ -160,13 +167,13 @@ export default class BPlusTree<K, V> {
     }
   }
 
-  private getChildIndexBinarySearch(key: K, childrenIds: number[], start: number, end: number): number {
+  private getChildIndexBinarySearch(key: K, childrenIds: Pointer<K>[], start: number, end: number): number {
     if (start === end) {
       return start;
     }
 
     const mid = Math.floor((start + end) / 2);
-    const child = this._storage.get(childrenIds[mid]);
+    const child = this._storage.get(childrenIds[mid].nodeId);
     const comparison = this.compareKey(key, child.key);
 
     if (comparison === 0) {
@@ -180,7 +187,7 @@ export default class BPlusTree<K, V> {
 
   private split(path: Node<K, V>[], node: Node<K, V>) {
     const midIndex = Math.floor((node.childrenId.length - (node.isLeaf ? 0 : 1)) / 2);
-    const midChild = this._storage.get(node.childrenId[midIndex]);
+    const midChild = this._storage.get(node.childrenId[midIndex].nodeId);
     const midKey = midChild.key;
     let pathParent: Node<K, V> | null = path[path.length - 1];
     if (pathParent === undefined) {
@@ -205,12 +212,12 @@ export default class BPlusTree<K, V> {
       if (newNodeChildId === undefined) {
         throw new Error('Trying to split empty leaf');
       }
-      const newNodeChild = this._storage.get(newNodeChildId);
+      const newNodeChild = this._storage.get(newNodeChildId.nodeId);
       if (newNodeChild && newNodeChild.nodeId) {
         const middleNode = this._storage.get(newNodeChild.nodeId);
 
         const newChild = { id: this._storage.newId(), key: null, nodeId: middleNode.id };
-        node.childrenId.push(newChild.id);
+        node.childrenId.push({ key: newChild.key, nodeId: newChild.id });
         this._storage.put(node.id, node);
         this._storage.put(newChild.id, newChild);
       }
@@ -221,9 +228,9 @@ export default class BPlusTree<K, V> {
       const { index } = this.getChildIndex(midKey, parent);
 
       const newChild = { id: this._storage.newId(), key: midKey, nodeId: node.id };
-      parent.childrenId.splice(index, 0, newChild.id);
+      parent.childrenId.splice(index, 0, { key: newChild.key, nodeId: newChild.id });
 
-      const other = this._storage.get(parent.childrenId[index + 1]) as Child<K, V>;
+      const other = this._storage.get(parent.childrenId[index + 1].nodeId) as Child<K, V>;
       other.nodeId = newNode.id;
 
       this._storage.put(parent.id, parent);
@@ -240,7 +247,10 @@ export default class BPlusTree<K, V> {
       this._root = {
         id: this._storage.newId(),
         isLeaf: false,
-        childrenId: [newLeft.id, newRight.id],
+        childrenId: [
+          { key: newLeft.key, nodeId: newLeft.id },
+          { key: newRight.key, nodeId: newRight.id },
+        ],
       };
       this._storage.put(newNode.id, newNode);
       this._storage.put(newLeft.id, newLeft);

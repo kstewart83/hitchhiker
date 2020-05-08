@@ -23,6 +23,7 @@ export class MemoryStorage implements IReferenceStorage {
   get(id: number): any | undefined {
     return this._data[id];
   }
+
   put(id: number, ref: any): void {
     this._data[id] = ref;
   }

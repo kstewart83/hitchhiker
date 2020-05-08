@@ -101,6 +101,9 @@ test('Insert 20 sequential keys with sequential value pairs, immediate check', (
     test.add(i, i);
     expect(test.find(i)).toBe(i);
   }
+
+  // tslint:disable-next-line: no-console
+  console.log(test.toDOT());
 });
 
 test('Insert 1000 sequential keys with random value pairs', () => {

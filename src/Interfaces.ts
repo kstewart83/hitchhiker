@@ -4,7 +4,7 @@ import NodeRef from './NodeRef';
 export interface Node<K, V> {
   id: number;
   isLeaf: boolean;
-  childrenId: number[];
+  childrenId: Pointer<K>[];
 }
 
 export interface Child<K, V> {
@@ -12,6 +12,11 @@ export interface Child<K, V> {
   key?: K | null;
   value?: V;
   nodeId?: number;
+}
+
+export interface Pointer<K> {
+  key: K | null;
+  nodeId: number;
 }
 
 export interface IReference<T> {
