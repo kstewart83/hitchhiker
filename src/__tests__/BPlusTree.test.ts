@@ -101,9 +101,42 @@ test('Insert 20 sequential keys with sequential value pairs, immediate check', (
     test.add(i, i);
     expect(test.find(i)).toBe(i);
   }
+});
 
-  // tslint:disable-next-line: no-console
-  console.log(test.toDOT());
+test('Insert 20 random keys with random value pairs, immediate check', () => {
+  const branchingFactor = 5;
+  const total = 20;
+  const rng = new PcgRandom(42);
+  const test = new BPlusTree<number, number>(branchingFactor);
+  for (let i = 0; i < total; i++) {
+    const k = rng.integer();
+    const v = rng.integer();
+    test.add(k, v);
+    expect(test.find(k)).toBe(v);
+  }
+});
+
+test('Insert 50 sequential keys with sequential value pairs, immediate check', () => {
+  const branchingFactor = 5;
+  const total = 50;
+  const test = new BPlusTree<number, number>(branchingFactor);
+  for (let i = 0; i < total; i++) {
+    test.add(i, i);
+    expect(test.find(i)).toBe(i);
+  }
+});
+
+test('Insert 50 random keys with random value pairs, immediate check', () => {
+  const branchingFactor = 5;
+  const total = 50;
+  const rng = new PcgRandom(42);
+  const test = new BPlusTree<number, number>(branchingFactor);
+  for (let i = 0; i < total; i++) {
+    const k = rng.integer();
+    const v = rng.integer();
+    test.add(k, v);
+    expect(test.find(k)).toBe(v);
+  }
 });
 
 test('Insert 1000 sequential keys with random value pairs', () => {
