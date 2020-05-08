@@ -41,7 +41,9 @@ export default class BPlusTree<K, V> {
     const { index, found } = this.getChildIndex(key, leaf);
 
     if (found) {
-      return leaf.children[index].value;
+      const leafChild = this._storage.get(leaf.childrenId[index]);
+      return leafChild.value;
+      // return leaf.children[index].value;
     } else {
       return undefined;
     }
@@ -144,8 +146,9 @@ export default class BPlusTree<K, V> {
       end--;
     }
 
-    const index = this.getChildIndexBinarySearch(key, node.children, 0, end);
-    const comparison = this.compareKey(key, node.children[index].key);
+    const index = this.getChildIndexBinarySearch(key, node.childrenId, 0, end);
+    const nodeChild = this._storage.get(node.childrenId[index]);
+    const comparison = this.compareKey(key, nodeChild.key);
 
     if (comparison === 0) {
       return { index, found: true };
@@ -156,20 +159,21 @@ export default class BPlusTree<K, V> {
     }
   }
 
-  private getChildIndexBinarySearch(key: K, children: Child<K, V>[], start: number, end: number): number {
+  private getChildIndexBinarySearch(key: K, childrenIds: number[], start: number, end: number): number {
     if (start === end) {
       return start;
     }
 
     const mid = Math.floor((start + end) / 2);
-    const comparison = this.compareKey(key, children[mid].key);
+    const child = this._storage.get(childrenIds[mid]);
+    const comparison = this.compareKey(key, child.key);
 
     if (comparison === 0) {
       return mid;
     } else if (comparison < 0) {
-      return this.getChildIndexBinarySearch(key, children, start, Math.max(start, mid - 1));
+      return this.getChildIndexBinarySearch(key, childrenIds, start, Math.max(start, mid - 1));
     } else {
-      return this.getChildIndexBinarySearch(key, children, Math.min(end, mid + 1), end);
+      return this.getChildIndexBinarySearch(key, childrenIds, Math.min(end, mid + 1), end);
     }
   }
 
