@@ -4,15 +4,8 @@ import NodeRef from './NodeRef';
 export interface Node<K, V> {
   id: number;
   isLeaf: boolean;
-  childrenId: Pointer<K>[];
+  pointers: Pointer<K>[];
   entries: Entry<K, V>[];
-}
-
-export interface Child<K, V> {
-  id: number;
-  key?: K | null;
-  value?: V;
-  nodeId?: number;
 }
 
 export interface Entry<K, V> {
