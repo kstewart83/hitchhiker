@@ -112,14 +112,16 @@ export default class BPlusTree<K, V> {
 
   private toDOTInternal(node: Node<K, V>, str: string): string {
     if (node.isLeaf) {
-      node.children.forEach((c) => {
+      node.childrenId.forEach((cId) => {
+        const c = this._storage.get(cId);
         str += `n${node.id} [fillcolor="#ffddff", style=filled, label="N${node.id}"]\n`;
         str += `n${node.id} -> n${c.id}\n`;
         str += `n${c.id} [color=blue, label="N${c.id}|[${c.key}, ${c.value}]"]\n`;
       });
       return str;
     } else {
-      node.children.forEach((c) => {
+      node.childrenId.forEach((cId) => {
+        const c = this._storage.get(cId);
         if (c.nodeId) {
           str += `n${node.id} [fillcolor="#dddddd", style=filled, label="N${node.id}"]\n`;
           str += `n${node.id} -> n${c.id}\n`;
