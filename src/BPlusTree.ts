@@ -209,7 +209,7 @@ export default class BPlusTree<K, V> {
       if (newNodeChild && newNodeChild.nodeId) {
         const middleNode = this._storage.get(newNodeChild.nodeId);
 
-        const newChild = { id: this._storage.newId(), key: null, node: middleNode, nodeId: middleNode.id };
+        const newChild = { id: this._storage.newId(), key: null, nodeId: middleNode.id };
         node.childrenId.push(newChild.id);
         this._storage.put(node.id, node);
         this._storage.put(newChild.id, newChild);
@@ -220,7 +220,7 @@ export default class BPlusTree<K, V> {
     if (parent) {
       const { index } = this.getChildIndex(midKey, parent);
 
-      const newChild = { id: this._storage.newId(), key: midKey, node, nodeId: node.id };
+      const newChild = { id: this._storage.newId(), key: midKey, nodeId: node.id };
       parent.childrenId.splice(index, 0, newChild.id);
 
       const other = this._storage.get(parent.childrenId[index + 1]) as Child<K, V>;
@@ -235,8 +235,8 @@ export default class BPlusTree<K, V> {
         this.split(newPath, parent);
       }
     } else {
-      const newLeft = { id: this._storage.newId(), key: midKey, node, nodeId: node.id };
-      const newRight = { id: this._storage.newId(), key: null, node: newNode, nodeId: newNode.id };
+      const newLeft = { id: this._storage.newId(), key: midKey, nodeId: node.id };
+      const newRight = { id: this._storage.newId(), key: null, nodeId: newNode.id };
       this._root = {
         id: this._storage.newId(),
         isLeaf: false,
@@ -246,9 +246,10 @@ export default class BPlusTree<K, V> {
       this._storage.put(newLeft.id, newLeft);
       this._storage.put(newRight.id, newRight);
       this._storage.put(this._root.id, this._root);
-      this._storage.putMetadata({
+      this._metadata = {
         rootId: this._root.id,
-      });
+      };
+      this._storage.putMetadata(this._metadata);
     }
   }
 
