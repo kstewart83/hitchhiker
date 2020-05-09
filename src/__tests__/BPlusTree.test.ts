@@ -192,3 +192,21 @@ test('Insert 1000 random key value pairs twice with duplicate keys and different
     expect(test.find(keyRng.integer())).toBe(valRng.integer());
   }
 });
+
+test('Generate DOT graph string', () => {
+  const branchingFactor = 15;
+  const total = 50;
+  const rng = new PcgRandom(42);
+  const test = new BPlusTree<number, number>(branchingFactor);
+  for (let i = 0; i < total; i++) {
+    const k = rng.integer() % 500;
+    const v = rng.integer() % 500;
+    test.add(k, v);
+    expect(test.find(k)).toBe(v);
+  }
+
+  const dot = test.toDOT();
+  expect(dot.length).toBeGreaterThan(0);
+  // tslint:disable-next-line: no-console
+  // console.log(dot);
+});
