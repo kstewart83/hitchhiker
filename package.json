@@ -22,7 +22,7 @@
   },
   "keywords": [],
   "author": "",
-  "license": "UNLICENSE",
+  "license": "Unlicense",
   "bugs": {
     "url": "https://github.com/kstewart83/hitchhiker/issues"
   },
@@ -34,6 +34,7 @@
     "pcg-random": "^1.0.0",
     "prettier": "^2.0.5",
     "ts-jest": "^25.4.0",
+    "ts-node": "^8.10.1",
     "tslint": "^6.1.2",
     "tslint-config-prettier": "^1.18.0",
     "typescript": "^3.8.3"
