@@ -241,15 +241,19 @@ export default class BPlusTree<K, V> {
 
     if (!node.isLeaf) {
       const newNodeChildId = newNode.pointers.shift();
+      this._storage.put(newNode.id, newNode);
       if (newNodeChildId === undefined) {
         throw new Error('Trying to split empty internal node');
       }
       const newNodeChild = this._storage.get(newNodeChildId.nodeId);
       if (newNodeChild) {
         node.pointers.push({ key: null, nodeId: newNodeChild.id });
-        this._storage.put(node.id, node);
+      } else {
+        throw new Error('Child node does not exist');
       }
     }
+
+    this._storage.put(node.id, node);
 
     if (parent) {
       const { index } = this.getChildIndex(midKey, parent);
