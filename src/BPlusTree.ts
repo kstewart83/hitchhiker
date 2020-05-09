@@ -66,8 +66,7 @@ export default class BPlusTree<K, V> {
     }
 
     // otherwise, insert key/value pair based on the returned index
-    const newChild = { id: this._storage.newId(), key, value };
-    leaf.entries.splice(index, 0, { key: newChild.key, value: newChild.value });
+    leaf.entries.splice(index, 0, { key, value });
     this._storage.put(leaf.id, leaf);
 
     // if adding a new item fills the node, split it
