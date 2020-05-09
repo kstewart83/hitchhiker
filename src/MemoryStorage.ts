@@ -8,7 +8,8 @@ export class MemoryStorage implements IReferenceStorage {
     if (externalIdTracking) {
       this._extIdMap = new BPlusTree<number, number>(5, new MemoryStorage());
     }
-    this._id = 0;
+    this._metadataId = 0;
+    this._id = 1;
     this._data = {};
   }
 
@@ -16,12 +17,12 @@ export class MemoryStorage implements IReferenceStorage {
     return this._id++;
   }
 
-  putMetadata(meta: Metadata): void {
-    this._data.meta = meta;
+  putMetadata(meta: Buffer): void {
+    this.put(this._metadataId, meta);
   }
 
-  getMetadata(): Metadata {
-    return this._data.meta;
+  getMetadata(): Buffer | undefined {
+    return this.get(this._metadataId);
   }
 
   get(id: number): Buffer | undefined {
@@ -34,6 +35,7 @@ export class MemoryStorage implements IReferenceStorage {
 
   /*** PRIVATE ***/
 
+  private readonly _metadataId: number;
   private _id: number;
   private _data: any;
   private _extIdMap: BPlusTree<number, number> | undefined;

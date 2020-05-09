@@ -27,8 +27,8 @@ export interface Metadata {
 
 export interface IReferenceStorage {
   newId(): number;
-  getMetadata(): Metadata;
-  putMetadata(meta: Metadata): void;
+  getMetadata(): Buffer | undefined;
+  putMetadata(meta: Buffer): void;
   get(id: number): Buffer | undefined;
   put(id: number, ref: Buffer): void;
 }
