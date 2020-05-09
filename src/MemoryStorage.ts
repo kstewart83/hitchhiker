@@ -1,11 +1,15 @@
 import { IReferenceStorage, Node, Metadata } from './Interfaces';
 import * as assert from 'assert';
 import * as cbor from 'cbor';
+import BPlusTree from '.';
 
 export class MemoryStorage implements IReferenceStorage {
   /*** PUBLIC ***/
 
-  public constructor() {
+  public constructor(externalIdTracking: boolean = false) {
+    if (externalIdTracking) {
+      this._extIdMap = new BPlusTree<number, number>(5, new MemoryStorage());
+    }
     this._id = 0;
     this._data = {};
   }
@@ -44,6 +48,7 @@ export class MemoryStorage implements IReferenceStorage {
 
   private _id: number;
   private _data: any;
+  private _extIdMap: BPlusTree<number, number> | undefined;
 
   private serialize<K, V>(ref: Node<K, V>): Buffer {
     let data;
