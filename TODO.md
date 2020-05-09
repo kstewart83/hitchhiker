@@ -17,6 +17,7 @@ This document tracks the goals and tasks for each major and minor release of thi
 ### Tasks
 
 `.M--I--T--D.` <br/>
+`[-][x][x][-] [0.0.2]` Serialize/Deserialize nodes <br/>
 `[-][x][x][-] [0.0.2]` Create interface abstraction between tree operations and storage operations <br/>
 `[-][x][x][-] [0.0.2]` Create in-memory implementation of storage abstraction <br/>
 `[-][x][x][o] [0.0.2]` Externalize leaf node data structures <br/>
@@ -27,5 +28,5 @@ This document tracks the goals and tasks for each major and minor release of thi
 `[ ][ ][ ][ ]` Create on-disk implementation of storage abstraction (can use DB library) <br/>
 `[ ][ ][ ][ ]` Create DynamoDB implementation of storage abstraction <br/>
 `[ ][ ][ ][ ]` Support `delete` operation <br/>
-`[ ][ ][ ][ ]` Serialize/Deserialize nodes <br/>
 `[ ][ ][ ][ ]` Implement copy-on-write <br/>
+`[ ][ ][ ][ ]` Allow for arbitrary external identifiers <br/>
