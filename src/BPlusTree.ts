@@ -1,5 +1,7 @@
-import { Node, IReferenceStorage, Metadata } from './Interfaces';
+import { Node, IReferenceStorage, Entry, Pointer, Metadata } from './Interfaces';
 import MemoryStorage from './MemoryStorage';
+import * as assert from 'assert';
+import * as cbor from 'cbor';
 
 export default class BPlusTree<K, V> {
   /*** PUBLIC ***/
@@ -18,14 +20,11 @@ export default class BPlusTree<K, V> {
     this._comparator = comparator;
     this._metadata = this._storage.getMetadata();
     if (this._metadata) {
-      const root = this._storage.get<K, V>(this._metadata.rootId);
-      if (root === undefined) {
-        throw new Error('Error importing root node from storage');
-      }
+      const root = this.getNode(this._metadata.rootId);
       this._root = root;
     } else {
       this._root = { id: this._storage.newId(), isLeaf: true, pointers: [], entries: [] };
-      this._storage.put(this._root.id, this._root);
+      this.storeNode(this._root);
       this._metadata = {
         rootId: this._root.id,
       };
@@ -65,13 +64,14 @@ export default class BPlusTree<K, V> {
     // if key already exists, overwrite existing value
     if (found) {
       leaf.entries[index].value = value;
-      this._storage.put(leaf.id, leaf);
+      this.storeNode(leaf);
       return;
     }
 
     // otherwise, insert key/value pair based on the returned index
     leaf.entries.splice(index, 0, { key, value });
-    this._storage.put(leaf.id, leaf);
+    this.storeNode(leaf);
+    // this._storage.put(leaf.id, leaf);
 
     // if adding a new item fills the node, split it
     if (leaf.entries.length > this._branching - 1) {
@@ -94,6 +94,64 @@ export default class BPlusTree<K, V> {
   private _storage: IReferenceStorage;
   private _metadata: Metadata;
 
+  private storeNode(node: Node<K, V>) {
+    this._storage.put(node.id, this.serializeNode(node));
+  }
+
+  private getNode(id: number): Node<K, V> {
+    const result = this._storage.get(id);
+    if (result === undefined) {
+      throw new Error('Node not in storage');
+    }
+
+    return this.deserializeNode(result);
+  }
+
+  private serializeNode(node: Node<K, V>): Buffer {
+    let data;
+    if (node.isLeaf) {
+      data = node.entries.map((x) => {
+        return [x.key, x.value];
+      });
+    } else {
+      data = node.pointers.map((x) => {
+        return [x.key, x.nodeId];
+      });
+    }
+
+    return cbor.encode(node.id, node.isLeaf, data);
+  }
+
+  private deserializeNode(cborData: Buffer): Node<K, V> {
+    const decodeArray = cbor.decodeAllSync(cborData);
+    const refId = decodeArray[0] as number;
+    const refIsLeaf = decodeArray[1] as boolean;
+    const data = decodeArray[2] as any[];
+
+    let ref: Node<K, V>;
+    if (refIsLeaf) {
+      ref = {
+        id: refId,
+        isLeaf: refIsLeaf,
+        pointers: [],
+        entries: data.map((x: any[]) => {
+          return { key: x[0] as K, value: x[1] as V };
+        }),
+      };
+    } else {
+      ref = {
+        id: refId,
+        isLeaf: refIsLeaf,
+        pointers: data.map((x: any[]) => {
+          return { key: x[0] as K, nodeId: x[1] as number };
+        }),
+        entries: [],
+      };
+    }
+
+    return ref;
+  }
+
   private findLeaf(key: K, path: Node<K, V>[], node: Node<K, V>): { path: Node<K, V>[]; leaf: Node<K, V> } {
     if (node.isLeaf) {
       return { path, leaf: node };
@@ -101,10 +159,7 @@ export default class BPlusTree<K, V> {
       const { index, found } = this.getChildIndex(key, node);
 
       const childId = node.pointers[index + (found ? 1 : 0)];
-      const child = this._storage.get<K, V>(childId.nodeId);
-      if (child === undefined) {
-        throw new Error('Child not loaded properly from storage');
-      }
+      const child = this.getNode(childId.nodeId);
       return this.findLeaf(key, path.concat(node), child);
     }
   }
@@ -126,20 +181,17 @@ export default class BPlusTree<K, V> {
       let fieldStr = '';
       let i = 0;
       if (node.isLeaf) {
-        node.entries.forEach((d: any) => {
+        node.entries.forEach((d: Entry<K, V>) => {
           fieldStr += `|<c${i++}>[${d.key},${d.value == null ? '*' : d.value}]`;
         });
-        node.pointers.forEach((cId: any) => {
-          const child = this._storage.get<K, V>(cId.nodeId);
-          if (child === undefined) {
-            throw new Error('Child not properly loaded from storage');
-          }
+        node.pointers.forEach((cId: Pointer<K>) => {
+          const child = this.getNode(cId.nodeId);
           str += `n${node.id}:c${i} -> n${cId.nodeId}\n`;
           str = this.toDOTInternal(child, str);
         });
       } else {
-        node.pointers.forEach((cId: any) => {
-          const child = this._storage.get(cId.nodeId);
+        node.pointers.forEach((cId: Pointer<K>) => {
+          const child = this.getNode(cId.nodeId);
           str += `n${node.id}:c${i} -> n${cId.nodeId}\n`;
           fieldStr += `|<c${i++}>${cId.key == null ? '*' : cId.key}`;
           str = this.toDOTInternal(child, str);
@@ -234,33 +286,27 @@ export default class BPlusTree<K, V> {
       entries: node.entries.slice(midIndex),
     };
 
-    this._storage.put(newNode.id, newNode);
-
     node.pointers = node.pointers.slice(0, midIndex);
     node.entries = node.entries.slice(0, midIndex);
 
     if (!node.isLeaf) {
       const newNodeChildId = newNode.pointers.shift();
-      this._storage.put(newNode.id, newNode);
       if (newNodeChildId === undefined) {
         throw new Error('Trying to split empty internal node');
       }
-      const newNodeChild = this._storage.get(newNodeChildId.nodeId);
-      if (newNodeChild) {
-        node.pointers.push({ key: null, nodeId: newNodeChild.id });
-      } else {
-        throw new Error('Child node does not exist');
-      }
+      const newNodeChild = this.getNode(newNodeChildId.nodeId);
+      node.pointers.push({ key: null, nodeId: newNodeChild.id });
     }
 
-    this._storage.put(node.id, node);
+    this.storeNode(newNode);
+    this.storeNode(node);
 
     if (parent) {
       const { index } = this.getChildIndex(midKey, parent);
       parent.pointers.splice(index, 0, { key: midKey, nodeId: node.id });
       parent.pointers[index + 1].nodeId = newNode.id;
 
-      this._storage.put(parent.id, parent);
+      this.storeNode(parent);
       if (parent.pointers.length > this._branching) {
         const newPath = [...path].slice(0, path.length - 1);
         this.split(newPath, parent);
@@ -275,7 +321,8 @@ export default class BPlusTree<K, V> {
         ],
         entries: [],
       };
-      this._storage.put(this._root.id, this._root);
+
+      this.storeNode(this._root);
       this._metadata = {
         rootId: this._root.id,
       };
