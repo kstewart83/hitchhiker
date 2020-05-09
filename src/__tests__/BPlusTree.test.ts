@@ -137,8 +137,6 @@ test('Insert 50 random keys with random value pairs, immediate check', () => {
     test.add(k, v);
     expect(test.find(k)).toBe(v);
   }
-  // tslint:disable-next-line: no-console
-  console.log(test.toDOT());
 });
 
 test('Insert 1000 sequential keys with random value pairs', () => {
