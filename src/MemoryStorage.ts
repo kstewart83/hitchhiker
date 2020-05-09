@@ -23,11 +23,10 @@ export class MemoryStorage implements IReferenceStorage {
   }
 
   get<K, V>(id: number): Node<K, V> | undefined {
-    const v1 = this._data[id].obj;
-    const v2 = this.deserialize(this._data[id].cbor);
-    assert.deepEqual(v1, v2);
-    return v1;
-    // return this.deserialize(this._data[id].cbor);
+    const ref = this._data[id].obj;
+    const cborData = this.deserialize(this._data[id].cbor);
+    assert.deepEqual(ref, cborData);
+    return cborData as Node<K, V>;
   }
 
   put<K, V>(id: number, ref: Node<K, V>): void {
