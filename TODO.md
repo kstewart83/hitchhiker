@@ -28,3 +28,4 @@ This document tracks the goals and tasks for each major and minor release of thi
 `[ ][ ][ ][ ]` Create DynamoDB implementation of storage abstraction <br/>
 `[ ][ ][ ][ ]` Support `delete` operation <br/>
 `[ ][ ][ ][ ]` Serialize/Deserialize nodes <br/>
+`[ ][ ][ ][ ]` Implement copy-on-write <br/>
