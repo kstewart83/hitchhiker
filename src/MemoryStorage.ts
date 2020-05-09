@@ -1,44 +1,71 @@
 import { IReferenceStorage, Metadata } from './Interfaces';
-import BPlusTree from '.';
+import BPlusTree from './BPlusTree';
 
 export class MemoryStorage implements IReferenceStorage {
   /*** PUBLIC ***/
 
-  public constructor(externalIdTracking: boolean = false) {
-    if (externalIdTracking) {
-      this._extIdMap = new BPlusTree<number, number>(5, new MemoryStorage());
-    }
-    this._metadataId = 0;
-    this._id = 1;
+  public constructor() {
+    this._dataMetadataId = 0;
+    this._idMapMetadataId = 1;
     this._data = {};
-  }
+    this._nextId = 2;
+    const that = this;
 
-  newId(): number {
-    return this._id++;
+    this._extIdMap = new BPlusTree<number, number>(
+      10,
+      {
+        getMetadata() {
+          return that._data[that._idMapMetadataId];
+        },
+        putMetadata(meta: Buffer) {
+          that._data[that._idMapMetadataId] = meta;
+        },
+        get(id: number) {
+          return that._data[id];
+        },
+        put(id: number, ref: Buffer) {
+          that._data[id] = ref;
+        },
+      },
+      undefined,
+      () => {
+        return that._nextId++;
+      },
+    );
   }
 
   putMetadata(meta: Buffer): void {
-    this.put(this._metadataId, meta);
+    this._data[this._dataMetadataId] = meta;
   }
 
   getMetadata(): Buffer | undefined {
-    return this.get(this._metadataId);
+    return this._data[this._dataMetadataId];
   }
 
-  get(id: number): Buffer | undefined {
-    return this._data[id];
+  get(extId: number): Buffer | undefined {
+    const intId = this._extIdMap.find(extId);
+    if (intId === undefined) {
+      throw new Error('No internal key exists for external key');
+    }
+    return this._data[intId];
   }
 
-  put(id: number, ref: Buffer): void {
-    this._data[id] = ref;
+  put(extId: number, ref: Buffer): void {
+    let intId = this._extIdMap.find(extId);
+    if (intId === undefined) {
+      intId = this._nextId++;
+      this._extIdMap.add(extId, intId);
+    }
+    this._data[intId] = ref;
   }
 
   /*** PRIVATE ***/
 
-  private readonly _metadataId: number;
-  private _id: number;
+  private readonly _dataMetadataId: number;
+  private readonly _idMapMetadataId: number;
+  private _nextId: number;
   private _data: any;
-  private _extIdMap: BPlusTree<number, number> | undefined;
+  private _extIdMap: BPlusTree<number, number>;
 }
 
 export default MemoryStorage;

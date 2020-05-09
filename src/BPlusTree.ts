@@ -1,21 +1,33 @@
 import { Node, IReferenceStorage, Entry, Pointer, Metadata } from './Interfaces';
 import MemoryStorage from './MemoryStorage';
-import * as assert from 'assert';
 import * as cbor from 'cbor';
 
-export default class BPlusTree<K, V> {
+export class BPlusTree<K, V> {
   /*** PUBLIC ***/
 
   /**
    * @param branching Branching factor for each node.
    * @param comparator Custom compartor for key values
    */
-  public constructor(branching: number, storage?: IReferenceStorage, comparator?: (a: K, b: K) => number) {
+  public constructor(
+    branching: number,
+    storage?: IReferenceStorage,
+    comparator?: (a: K, b: K) => number,
+    idGenerator?: () => number,
+  ) {
     this._branching = branching;
     if (storage) {
       this._storage = storage;
     } else {
       this._storage = new MemoryStorage();
+    }
+    if (idGenerator === undefined) {
+      let nextId = 9900001;
+      this._idGenerator = () => {
+        return nextId++;
+      };
+    } else {
+      this._idGenerator = idGenerator;
     }
     this._comparator = comparator;
     const metadata = this.loadMetadata();
@@ -23,7 +35,7 @@ export default class BPlusTree<K, V> {
       this._metadata = metadata;
       this._root = this.loadNode(metadata.rootId);
     } else {
-      this._root = { id: this._storage.newId(), isLeaf: true, pointers: [], entries: [] };
+      this._root = { id: this._idGenerator(), isLeaf: true, pointers: [], entries: [] };
       this.storeNode(this._root);
       this._metadata = {
         rootId: this._root.id,
@@ -39,7 +51,7 @@ export default class BPlusTree<K, V> {
    * @returns Value associated with search key if it exists (can be null) or undefined
    * if search key is not in tree
    */
-  public find(key: K): V | null | undefined {
+  public find(key: K): V | undefined {
     const { leaf } = this.findLeaf(key, [], this._root);
     const { index, found } = this.getChildIndex(key, leaf);
 
@@ -93,6 +105,7 @@ export default class BPlusTree<K, V> {
   private _comparator?: (a: K, b: K) => number;
   private _storage: IReferenceStorage;
   private _metadata: Metadata;
+  private _idGenerator: () => number;
 
   private storeNode(node: Node<K, V>) {
     this._storage.put(node.id, this.serializeNode(node));
@@ -293,7 +306,7 @@ export default class BPlusTree<K, V> {
     }
 
     const newNode: Node<K, V> = {
-      id: this._storage.newId(),
+      id: this._idGenerator(),
       isLeaf: node.isLeaf,
       pointers: node.pointers.slice(midIndex),
       entries: node.entries.slice(midIndex),
@@ -326,7 +339,7 @@ export default class BPlusTree<K, V> {
       }
     } else {
       this._root = {
-        id: this._storage.newId(),
+        id: this._idGenerator(),
         isLeaf: false,
         pointers: [
           { key: midKey, nodeId: node.id },
@@ -365,3 +378,5 @@ export default class BPlusTree<K, V> {
     }
   }
 }
+
+export default BPlusTree;

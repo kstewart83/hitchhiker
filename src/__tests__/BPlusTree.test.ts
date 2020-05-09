@@ -139,6 +139,29 @@ test('Insert 50 random keys with random value pairs, immediate check', () => {
   }
 });
 
+test('Insert 100 sequential keys with sequential value pairs, immediate check', () => {
+  const branchingFactor = 5;
+  const total = 100;
+  const test = new BPlusTree<number, number>(branchingFactor);
+  for (let i = 0; i < total; i++) {
+    test.add(i, i);
+    expect(test.find(i)).toBe(i);
+  }
+});
+
+test('Insert 100 random keys with random value pairs, immediate check', () => {
+  const branchingFactor = 15;
+  const total = 100;
+  const rng = new PcgRandom(42);
+  const test = new BPlusTree<number, number>(branchingFactor);
+  for (let i = 0; i < total; i++) {
+    const k = rng.integer() % 500;
+    const v = rng.integer() % 500;
+    test.add(k, v);
+    expect(test.find(k)).toBe(v);
+  }
+});
+
 test('Insert 1000 sequential keys with random value pairs', () => {
   const branchingFactor = 5;
   const total = 1000;
