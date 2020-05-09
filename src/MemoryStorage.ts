@@ -1,4 +1,4 @@
-import { IReferenceStorage, Node, Entry, Pointer, Metadata } from './Interfaces';
+import { IReferenceStorage, Node, Metadata } from './Interfaces';
 import * as assert from 'assert';
 import * as cbor from 'cbor';
 
