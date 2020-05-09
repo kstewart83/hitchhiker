@@ -18,7 +18,7 @@ export default class BPlusTree<K, V> {
       this._storage = new MemoryStorage();
     }
     this._comparator = comparator;
-    this._metadata = this._storage.getMetadata();
+    this._metadata = this.getMetadata();
     if (this._metadata) {
       const root = this.getNode(this._metadata.rootId);
       this._root = root;
@@ -28,7 +28,7 @@ export default class BPlusTree<K, V> {
       this._metadata = {
         rootId: this._root.id,
       };
-      this._storage.putMetadata(this._metadata);
+      this.storeMetadata();
     }
   }
 
@@ -105,6 +105,15 @@ export default class BPlusTree<K, V> {
     }
 
     return this.deserializeNode(result);
+  }
+
+  private storeMetadata() {
+    this._storage.putMetadata(this._metadata);
+  }
+
+  private getMetadata(): Metadata {
+    this._metadata = this._storage.getMetadata();
+    return this._metadata;
   }
 
   private serializeNode(node: Node<K, V>): Buffer {
@@ -326,7 +335,7 @@ export default class BPlusTree<K, V> {
       this._metadata = {
         rootId: this._root.id,
       };
-      this._storage.putMetadata(this._metadata);
+      this.storeMetadata();
     }
   }
 
