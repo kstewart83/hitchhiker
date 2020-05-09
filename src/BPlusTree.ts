@@ -18,7 +18,11 @@ export default class BPlusTree<K, V> {
     this._comparator = comparator;
     this._metadata = this._storage.getMetadata();
     if (this._metadata) {
-      this._root = this._storage.get(this._metadata.rootId);
+      const root = this._storage.get<K, V>(this._metadata.rootId);
+      if (root === undefined) {
+        throw new Error('Error importing root node from storage');
+      }
+      this._root = root;
     } else {
       this._root = { id: this._storage.newId(), isLeaf: true, pointers: [], entries: [] };
       this._storage.put(this._root.id, this._root);
@@ -97,7 +101,10 @@ export default class BPlusTree<K, V> {
       const { index, found } = this.getChildIndex(key, node);
 
       const childId = node.pointers[index + (found ? 1 : 0)];
-      const child = this._storage.get(childId.nodeId);
+      const child = this._storage.get<K, V>(childId.nodeId);
+      if (child === undefined) {
+        throw new Error('Child not loaded properly from storage');
+      }
       return this.findLeaf(key, path.concat(node), child);
     }
   }
@@ -123,9 +130,9 @@ export default class BPlusTree<K, V> {
           fieldStr += `|<c${i++}>[${d.key},${d.value == null ? '*' : d.value}]`;
         });
         node.pointers.forEach((cId: any) => {
-          const child = this._storage.get(cId.nodeId);
-          if (child.nodeId) {
-            str += `n${node.id}:c${i} -> n${child.nodeId} [style=dotted]\n`;
+          const child = this._storage.get<K, V>(cId.nodeId);
+          if (child === undefined) {
+            throw new Error('Child not properly loaded from storage');
           }
           str += `n${node.id}:c${i} -> n${cId.nodeId}\n`;
           str = this.toDOTInternal(child, str);
@@ -133,9 +140,6 @@ export default class BPlusTree<K, V> {
       } else {
         node.pointers.forEach((cId: any) => {
           const child = this._storage.get(cId.nodeId);
-          if (child.nodeId) {
-            str += `n${node.id}:c${i} -> n${child.nodeId} [style=dotted]\n`;
-          }
           str += `n${node.id}:c${i} -> n${cId.nodeId}\n`;
           fieldStr += `|<c${i++}>${cId.key == null ? '*' : cId.key}`;
           str = this.toDOTInternal(child, str);

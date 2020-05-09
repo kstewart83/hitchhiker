@@ -28,6 +28,7 @@
   },
   "homepage": "https://github.com/kstewart83/hitchhiker#readme",
   "devDependencies": {
+    "@types/cbor": "^5.0.0",
     "@types/jest": "^25.2.1",
     "jest": "^25.5.4",
     "pcg-random": "^1.0.0",
@@ -37,7 +38,9 @@
     "tslint-config-prettier": "^1.18.0",
     "typescript": "^3.8.3"
   },
-  "dependencies": {},
+  "dependencies": {
+    "cbor": "^5.0.2"
+  },
   "files": [
     "lib/**/*"
   ]

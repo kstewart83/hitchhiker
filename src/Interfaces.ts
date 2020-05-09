@@ -32,6 +32,6 @@ export interface IReferenceStorage {
   newId(): number;
   getMetadata(): Metadata;
   putMetadata(meta: Metadata): void;
-  get(id: number): any | undefined;
-  put(id: number, ref: any): void;
+  get<K, V>(id: number): Node<K, V> | undefined;
+  put<K, V>(id: number, ref: Node<K, V>): void;
 }

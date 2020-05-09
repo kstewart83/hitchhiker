@@ -1,4 +1,5 @@
-import { IReferenceStorage, IReference, Metadata } from './Interfaces';
+import { IReferenceStorage, Metadata } from './Interfaces';
+import * as cbor from 'cbor';
 
 export class MemoryStorage implements IReferenceStorage {
   /*** PUBLIC ***/
@@ -21,11 +22,14 @@ export class MemoryStorage implements IReferenceStorage {
   }
 
   get(id: number): any | undefined {
-    return this._data[id];
+    return this._data[id].obj;
   }
 
   put(id: number, ref: any): void {
-    this._data[id] = ref;
+    this._data[id] = {
+      obj: ref,
+      cbor: cbor.encode(ref),
+    };
   }
 
   /*** PRIVATE ***/

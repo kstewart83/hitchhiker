@@ -27,3 +27,4 @@ This document tracks the goals and tasks for each major and minor release of thi
 `[ ][ ][ ][ ]` Create on-disk implementation of storage abstraction (can use DB library) <br/>
 `[ ][ ][ ][ ]` Create DynamoDB implementation of storage abstraction <br/>
 `[ ][ ][ ][ ]` Support `delete` operation <br/>
+`[ ][ ][ ][ ]` Serialize/Deserialize nodes <br/>
