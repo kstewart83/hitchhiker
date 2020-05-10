@@ -56,6 +56,21 @@ test.each([25, 50, 100, 250, 500, 1000])(
   },
 );
 
+test.each([25, 50])('Insert %d sequential keys with sequential value pairs, then delete all keys', (total: number) => {
+  const test = new BPlusTree<number, number>();
+  for (let i = 0; i < total; i++) {
+    test.add(i, i);
+    const str = test.toDOT();
+  }
+
+  for (let i = 0; i < total; i++) {
+    const result = test.delete(i);
+    const str = test.toDOT();
+    expect(result).toBe(i);
+    expect(test.find(i)).toBeUndefined();
+  }
+});
+
 test.each([25, 50, 100, 250, 500, 1000])('Insert %i sequential keys with random value pairs', (total: number) => {
   let rng = new PcgRandom(total);
   const test = new BPlusTree<number, number>();

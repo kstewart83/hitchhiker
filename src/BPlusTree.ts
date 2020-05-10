@@ -16,9 +16,9 @@ export class BPlusTree<K, V> {
       this._storage = new MemoryStorage();
     }
     if (idGenerator === undefined) {
-      let nextId = 99000000 + Math.random() * 10000000;
+      const baseId = 99000000;
       this._idGenerator = () => {
-        return nextId++;
+        return baseId + Math.floor(Math.random() * 10000000);
       };
     } else {
       this._idGenerator = idGenerator;
@@ -80,6 +80,27 @@ export class BPlusTree<K, V> {
   }
 
   /**
+   * This function deletes the key/value pair from the tree
+   *
+   * @param key Key to delete from tree
+   */
+  public delete(key: K): V | undefined {
+    const { path, leaf } = this.findLeaf(key, [], this._root);
+    const { index, found } = this.getChildIndex(key, leaf);
+
+    // if key already exists, overwrite existing value
+    if (found) {
+      const entry = leaf.entries.splice(index, 1)[0];
+      this.storeNode(leaf, path);
+      return entry.value;
+    } else {
+      return undefined;
+    }
+
+    return;
+  }
+
+  /**
    * Convert tree to DOT representation
    */
   public toDOT(): string {
@@ -98,21 +119,33 @@ export class BPlusTree<K, V> {
         fillColor = `fillcolor="${node.isLeaf ? '#88ffff' : '#ffff88'}"`;
       }
       if (node.isLeaf) {
+        fieldStr += `
+  <table border="0" cellborder="1" cellspacing="0">
+    <tr><td cellborder="1" bgcolor="#eeffff"><b>E${node.id}:I${next.value.key}</b></td></tr>
+    <hr/>
+    <tr><td border="0" >
+      <table cellspacing='0'>
+        <tr><td bgcolor="#88ffcc"><b>K</b></td><td bgcolor="#88ffcc"><b>V</b></td></tr>        
+        `;
         node.entries.forEach((d) => {
-          fieldStr += `|<c${i++}>[${d.key},${d.value == null ? '*' : d.value}]`;
+          fieldStr += `<tr><td>${d.key}</td><td>${d.value == null ? '*' : d.value}`;
+          fieldStr += `</td></tr>\n`;
         });
+        fieldStr += `
+        </table></td></tr>
+        </table>`;
+        str += `n${node.id} [${fillColor}, style=filled, label=<${fieldStr}>];\n`;
       } else {
         node.pointers.forEach((cId) => {
           str += `n${node.id}:c${i} -> n${cId.nodeId}\n`;
           fieldStr += `|<c${i++}>${cId.key == null ? '*' : cId.key}`;
         });
+        str += `n${node.id} [${fillColor}, style=filled, label="E${node.id}:I${next.value.key}${fieldStr}"]\n`;
       }
-      str += `n${node.id} [${fillColor}, style=filled, label="<n>N${node.id}:${next.value.key}${fieldStr}"]\n`;
       next = gen.next();
     }
 
     return str;
-    // return this.toDOTInternal(this._root, '');
   }
 
   /*** PRIVATE ***/
