@@ -51,6 +51,4 @@ declare module 'pcg-random' {
      */
     number(): number;
   }
-
-  export default PcgRandom;
 }
