@@ -9,13 +9,7 @@ export class BPlusTree<K, V> {
    * @param branching Branching factor for each node.
    * @param comparator Custom compartor for key values
    */
-  public constructor(
-    branching: number,
-    storage?: IReferenceStorage,
-    comparator?: (a: K, b: K) => number,
-    idGenerator?: () => number,
-  ) {
-    this._branching = branching;
+  public constructor(storage?: IReferenceStorage, comparator?: (a: K, b: K) => number, idGenerator?: () => number) {
     if (storage) {
       this._storage = storage;
     } else {
@@ -76,39 +70,71 @@ export class BPlusTree<K, V> {
     // if key already exists, overwrite existing value
     if (found) {
       leaf.entries[index].value = value;
-      this.storeNode(leaf);
+      this.storeNode(leaf, path);
       return;
     }
 
     // otherwise, insert key/value pair based on the returned index
     leaf.entries.splice(index, 0, { key, value });
-    this.storeNode(leaf);
-    // this._storage.put(leaf.id, leaf);
-
-    // if adding a new item fills the node, split it
-    if (leaf.entries.length > this._branching - 1) {
-      this.split(path, leaf);
-    }
+    this.storeNode(leaf, path);
   }
 
   /**
    * Convert tree to DOT representation
    */
   public toDOT(): string {
-    return this.toDOTInternal(this._root, '');
+    let str = '';
+    const gen = this._storage.generator();
+    let next = gen.next();
+    while (!next.done) {
+      const nextResult = next.value;
+      const node = this.deserializeNode(nextResult.buffer);
+      let fieldStr = '';
+      let i = 0;
+      let fillColor = '';
+      if (node.id > 9900000) {
+        fillColor = `fillcolor="${node.isLeaf ? '#ddffff' : '#ffffdd'}"`;
+      } else {
+        fillColor = `fillcolor="${node.isLeaf ? '#88ffff' : '#ffff88'}"`;
+      }
+      if (node.isLeaf) {
+        node.entries.forEach((d) => {
+          fieldStr += `|<c${i++}>[${d.key},${d.value == null ? '*' : d.value}]`;
+        });
+      } else {
+        node.pointers.forEach((cId) => {
+          str += `n${node.id}:c${i} -> n${cId.nodeId}\n`;
+          fieldStr += `|<c${i++}>${cId.key == null ? '*' : cId.key}`;
+        });
+      }
+      str += `n${node.id} [${fillColor}, style=filled, label="<n>N${node.id}:${next.value.key}${fieldStr}"]\n`;
+      next = gen.next();
+    }
+
+    return str;
+    // return this.toDOTInternal(this._root, '');
   }
 
   /*** PRIVATE ***/
 
   private _root: Node<K, V>;
-  private _branching: number;
   private _comparator?: (a: K, b: K) => number;
   private _storage: IReferenceStorage;
   private _metadata: Metadata;
   private _idGenerator: () => number;
 
-  private storeNode(node: Node<K, V>) {
-    this._storage.put(node.id, this.serializeNode(node));
+  private storeNode(node: Node<K, V>, path?: Node<K, V>[]) {
+    const nodeBuf = this.serializeNode(node);
+
+    // if adding a new item fills the node, split it
+    if (nodeBuf.length > this._storage.maxNodeSize() - 1) {
+      if (path === undefined) {
+        throw new Error('Must provide path if node exceeds max size');
+      }
+      this.split(path, node);
+    } else {
+      this._storage.put(node.id, nodeBuf);
+    }
   }
 
   private loadNode(id: number): Node<K, V> {
@@ -324,19 +350,16 @@ export class BPlusTree<K, V> {
       node.pointers.push({ key: null, nodeId: newNodeChild.id });
     }
 
-    this.storeNode(newNode);
-    this.storeNode(node);
+    this.storeNode(newNode, path);
+    this.storeNode(node, path);
 
     if (parent) {
       const { index } = this.getChildIndex(midKey, parent);
       parent.pointers.splice(index, 0, { key: midKey, nodeId: node.id });
       parent.pointers[index + 1].nodeId = newNode.id;
 
-      this.storeNode(parent);
-      if (parent.pointers.length > this._branching) {
-        const newPath = [...path].slice(0, path.length - 1);
-        this.split(newPath, parent);
-      }
+      const newPath = [...path].slice(0, path.length - 1);
+      this.storeNode(parent, newPath);
     } else {
       this._root = {
         id: this._idGenerator(),

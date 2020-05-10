@@ -2,17 +2,17 @@ import BPlusTree from '../BPlusTree';
 import PcgRandom from 'pcg-random';
 
 test('Add simple key with null value', () => {
-  const test = new BPlusTree<number, number | null>(5);
+  const test = new BPlusTree<number, number | null>();
   test.add(0, null);
 });
 
 test('Add simple key value', () => {
-  const test = new BPlusTree<number, number>(5);
+  const test = new BPlusTree<number, number>();
   test.add(0, 0);
 });
 
 test('Find key value after single add', () => {
-  const test = new BPlusTree<number, number>(5);
+  const test = new BPlusTree<number, number>();
   test.add(0, 0);
   const result = test.find(0);
 
@@ -20,7 +20,7 @@ test('Find key value after single add', () => {
 });
 
 test('Find key value after single add of null value', () => {
-  const test = new BPlusTree<number, number | null>(5);
+  const test = new BPlusTree<number, number | null>();
   test.add(0, null);
   const result = test.find(0);
 
@@ -28,7 +28,7 @@ test('Find key value after single add of null value', () => {
 });
 
 test('Find keys after two adds', () => {
-  const test = new BPlusTree<number, number>(5);
+  const test = new BPlusTree<number, number>();
   test.add(0, 0);
   test.add(1, 1);
 
@@ -37,7 +37,7 @@ test('Find keys after two adds', () => {
 });
 
 test('Find keys after two adds, reverse order', () => {
-  const test = new BPlusTree<number, number>(5);
+  const test = new BPlusTree<number, number>();
   test.add(1, 1);
   test.add(0, 0);
 
@@ -45,69 +45,19 @@ test('Find keys after two adds, reverse order', () => {
   expect(test.find(1)).toBe(1);
 });
 
-test('Fill root node up to branching factor minus 1', () => {
-  const branchingFactor = 5;
-  const test = new BPlusTree<number, number>(branchingFactor);
-  for (let i = 0; i < branchingFactor - 1; i++) {
-    test.add(i, i);
-  }
-
-  for (let i = 0; i < branchingFactor - 1; i++) {
-    expect(test.find(i)).toBe(i);
-  }
-});
-
-test('Fill root node up to branching factor minus 1, reverse order', () => {
-  const branchingFactor = 5;
-  const test = new BPlusTree<number, number>(branchingFactor);
-  for (let i = branchingFactor - 1; i > 0; i--) {
-    test.add(i, i);
-  }
-
-  for (let i = branchingFactor - 1; i > 0; i--) {
-    expect(test.find(i)).toBe(i);
-  }
-});
-
-test('Fill root node up to branching factor', () => {
-  const branchingFactor = 5;
-  const test = new BPlusTree<number, number>(branchingFactor);
-  for (let i = 0; i < branchingFactor; i++) {
-    test.add(i, i);
-  }
-
-  for (let i = 0; i < branchingFactor; i++) {
-    expect(test.find(i)).toBe(i);
-  }
-});
-
-test('Fill root node up to branching factor plus 1', () => {
-  const branchingFactor = 5;
-  const test = new BPlusTree<number, number>(branchingFactor);
-  for (let i = 0; i < branchingFactor + 1; i++) {
-    test.add(i, i);
-  }
-
-  for (let i = 0; i < branchingFactor + 1; i++) {
-    expect(test.find(i)).toBe(i);
-  }
-});
-
-test('Insert 20 sequential keys with sequential value pairs, immediate check', () => {
-  const branchingFactor = 5;
-  const total = 20;
-  const test = new BPlusTree<number, number>(branchingFactor);
+test('Insert 25 sequential keys with sequential value pairs, immediate check', () => {
+  const total = 25;
+  const test = new BPlusTree<number, number>();
   for (let i = 0; i < total; i++) {
     test.add(i, i);
     expect(test.find(i)).toBe(i);
   }
 });
 
-test('Insert 20 random keys with random value pairs, immediate check', () => {
-  const branchingFactor = 5;
-  const total = 20;
+test('Insert 25 random keys with random value pairs, immediate check', () => {
+  const total = 25;
   const rng = new PcgRandom(42);
-  const test = new BPlusTree<number, number>(branchingFactor);
+  const test = new BPlusTree<number, number>();
   for (let i = 0; i < total; i++) {
     const k = rng.integer() % 500;
     const v = rng.integer() % 500;
@@ -116,10 +66,30 @@ test('Insert 20 random keys with random value pairs, immediate check', () => {
   }
 });
 
+test('Insert 25 random key value pairs twice with duplicate keys and different values', () => {
+  let keyRng = new PcgRandom(42);
+  let valRng = new PcgRandom(24);
+  const test = new BPlusTree<number, number>();
+  for (let i = 0; i < 25; i++) {
+    test.add(keyRng.integer(), valRng.integer());
+  }
+
+  keyRng = new PcgRandom(42);
+  valRng = new PcgRandom(4242);
+  for (let i = 0; i < 25; i++) {
+    test.add(keyRng.integer(), valRng.integer());
+  }
+
+  keyRng = new PcgRandom(42);
+  valRng = new PcgRandom(4242);
+  for (let i = 0; i < 25; i++) {
+    expect(test.find(keyRng.integer())).toBe(valRng.integer());
+  }
+});
+
 test('Insert 50 sequential keys with sequential value pairs, immediate check', () => {
-  const branchingFactor = 5;
   const total = 50;
-  const test = new BPlusTree<number, number>(branchingFactor);
+  const test = new BPlusTree<number, number>();
   for (let i = 0; i < total; i++) {
     test.add(i, i);
     expect(test.find(i)).toBe(i);
@@ -127,10 +97,9 @@ test('Insert 50 sequential keys with sequential value pairs, immediate check', (
 });
 
 test('Insert 50 random keys with random value pairs, immediate check', () => {
-  const branchingFactor = 15;
   const total = 50;
   const rng = new PcgRandom(42);
-  const test = new BPlusTree<number, number>(branchingFactor);
+  const test = new BPlusTree<number, number>();
   for (let i = 0; i < total; i++) {
     const k = rng.integer() % 500;
     const v = rng.integer() % 500;
@@ -140,9 +109,8 @@ test('Insert 50 random keys with random value pairs, immediate check', () => {
 });
 
 test('Insert 100 sequential keys with sequential value pairs, immediate check', () => {
-  const branchingFactor = 5;
   const total = 100;
-  const test = new BPlusTree<number, number>(branchingFactor);
+  const test = new BPlusTree<number, number>();
   for (let i = 0; i < total; i++) {
     test.add(i, i);
     expect(test.find(i)).toBe(i);
@@ -150,10 +118,9 @@ test('Insert 100 sequential keys with sequential value pairs, immediate check', 
 });
 
 test('Insert 100 random keys with random value pairs, immediate check', () => {
-  const branchingFactor = 15;
   const total = 100;
   const rng = new PcgRandom(42);
-  const test = new BPlusTree<number, number>(branchingFactor);
+  const test = new BPlusTree<number, number>();
   for (let i = 0; i < total; i++) {
     const k = rng.integer() % 500;
     const v = rng.integer() % 500;
@@ -163,10 +130,9 @@ test('Insert 100 random keys with random value pairs, immediate check', () => {
 });
 
 test('Insert 1000 sequential keys with random value pairs', () => {
-  const branchingFactor = 5;
   const total = 1000;
   let rng = new PcgRandom(42);
-  const test = new BPlusTree<number, number>(branchingFactor);
+  const test = new BPlusTree<number, number>();
   for (let i = 0; i < total; i++) {
     test.add(i, rng.integer() % 5000);
   }
@@ -178,10 +144,9 @@ test('Insert 1000 sequential keys with random value pairs', () => {
 });
 
 test('Insert 1000 random key value pairs', () => {
-  const branchingFactor = 5;
   const total = 1000;
   let rng = new PcgRandom(42);
-  const test = new BPlusTree<number, number>(branchingFactor);
+  const test = new BPlusTree<number, number>();
   for (let i = 0; i < total; i++) {
     test.add(rng.integer(), rng.integer());
   }
@@ -193,10 +158,9 @@ test('Insert 1000 random key value pairs', () => {
 });
 
 test('Insert 1000 random key value pairs twice with duplicate keys and different values', () => {
-  const branchingFactor = 5;
   let keyRng = new PcgRandom(42);
   let valRng = new PcgRandom(24);
-  const test = new BPlusTree<number, number>(branchingFactor);
+  const test = new BPlusTree<number, number>();
   for (let i = 0; i < 1000; i++) {
     test.add(keyRng.integer(), valRng.integer());
   }
@@ -215,10 +179,9 @@ test('Insert 1000 random key value pairs twice with duplicate keys and different
 });
 
 test('Generate DOT graph string', () => {
-  const branchingFactor = 15;
   const total = 50;
   const rng = new PcgRandom(42);
-  const test = new BPlusTree<number, number>(branchingFactor);
+  const test = new BPlusTree<number, number>();
   for (let i = 0; i < total; i++) {
     const k = rng.integer() % 500;
     const v = rng.integer() % 500;

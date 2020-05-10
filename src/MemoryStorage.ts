@@ -5,6 +5,7 @@ export class MemoryStorage implements IReferenceStorage {
   /*** PUBLIC ***/
 
   public constructor() {
+    this._maxNodeSize = 50;
     this._dataMetadataId = 0;
     this._idMapMetadataId = 1;
     this._data = {};
@@ -12,8 +13,10 @@ export class MemoryStorage implements IReferenceStorage {
     const that = this;
 
     this._extIdMap = new BPlusTree<number, number>(
-      10,
       {
+        maxNodeSize() {
+          return that._maxNodeSize;
+        },
         getMetadata() {
           return that._data[that._idMapMetadataId];
         },
@@ -26,12 +29,19 @@ export class MemoryStorage implements IReferenceStorage {
         put(id: number, ref: Buffer) {
           that._data[id] = ref;
         },
+        generator() {
+          throw new Error('Not Implemented');
+        },
       },
       undefined,
       () => {
         return that._nextId++;
       },
     );
+  }
+
+  maxNodeSize(): number {
+    return this._maxNodeSize;
   }
 
   putMetadata(meta: Buffer): void {
@@ -59,12 +69,43 @@ export class MemoryStorage implements IReferenceStorage {
     this._data[intId] = ref;
   }
 
+  *generator(count?: number) {
+    function* entries(obj: { [key: number]: Buffer }) {
+      for (const key of Object.keys(obj)) {
+        const k = parseInt(key, 10);
+        yield {
+          key: k,
+          value: obj[k],
+        };
+      }
+    }
+
+    const keys = entries(this._data);
+
+    let i = 0;
+    let nextEntry = keys.next();
+    while (!nextEntry.done) {
+      if (nextEntry.value.key !== this._dataMetadataId && nextEntry.value.key !== this._idMapMetadataId) {
+        yield {
+          key: nextEntry.value.key,
+          buffer: nextEntry.value.value,
+        };
+      }
+      if (count && i++ > count) {
+        return false;
+      }
+      nextEntry = keys.next();
+    }
+    return true;
+  }
+
   /*** PRIVATE ***/
 
   private readonly _dataMetadataId: number;
   private readonly _idMapMetadataId: number;
+  private readonly _maxNodeSize: number;
   private _nextId: number;
-  private _data: any;
+  private _data: { [key: number]: Buffer };
   private _extIdMap: BPlusTree<number, number>;
 }
 

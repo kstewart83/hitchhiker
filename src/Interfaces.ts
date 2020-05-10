@@ -26,8 +26,19 @@ export interface Metadata {
 }
 
 export interface IReferenceStorage {
+  maxNodeSize(): number;
   getMetadata(): Buffer | undefined;
   putMetadata(meta: Buffer): void;
   get(id: number): Buffer | undefined;
   put(id: number, ref: Buffer): void;
+  generator(
+    count?: number,
+  ): Generator<
+    {
+      key: number;
+      buffer: Buffer;
+    },
+    boolean,
+    number
+  >;
 }
