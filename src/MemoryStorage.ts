@@ -5,7 +5,7 @@ export class MemoryStorage implements IReferenceStorage {
   /*** PUBLIC ***/
 
   public constructor() {
-    this._maxNodeSize = 50;
+    this._maxNodeSize = 4096;
     this._dataMetadataId = 0;
     this._idMapMetadataId = 1;
     this._data = {};
