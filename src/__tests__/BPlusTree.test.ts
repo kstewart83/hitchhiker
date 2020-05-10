@@ -45,138 +45,67 @@ test('Find keys after two adds, reverse order', () => {
   expect(test.find(1)).toBe(1);
 });
 
-test('Insert 25 sequential keys with sequential value pairs, immediate check', () => {
-  const total = 25;
+test.each([25, 50, 100, 250, 500, 1000])(
+  'Insert %d sequential keys with sequential value pairs, immediate check',
+  (total: number) => {
+    const test = new BPlusTree<number, number>();
+    for (let i = 0; i < total; i++) {
+      test.add(i, i);
+      expect(test.find(i)).toBe(i);
+    }
+  },
+);
+
+test.each([25, 50, 100, 250, 500, 1000])('Insert %i sequential keys with random value pairs', (total: number) => {
+  let rng = new PcgRandom(total);
   const test = new BPlusTree<number, number>();
   for (let i = 0; i < total; i++) {
-    test.add(i, i);
-    expect(test.find(i)).toBe(i);
+    test.add(i, rng.integer());
+  }
+
+  rng = new PcgRandom(total);
+  for (let i = 0; i < total; i++) {
+    expect(test.find(i)).toBe(rng.integer());
   }
 });
 
-test('Insert 25 random keys with random value pairs, immediate check', () => {
-  const total = 25;
-  const rng = new PcgRandom(42);
-  const test = new BPlusTree<number, number>();
-  for (let i = 0; i < total; i++) {
-    const k = rng.integer() % 500;
-    const v = rng.integer() % 500;
-    test.add(k, v);
-    expect(test.find(k)).toBe(v);
-  }
-});
+test.each([25, 50, 100, 250, 500, 1000])(
+  'Insert %d random keys with random value pairs, immediate check',
+  (total: number) => {
+    const rng = new PcgRandom(total);
+    const test = new BPlusTree<number, number>();
+    for (let i = 0; i < total; i++) {
+      const k = rng.integer();
+      const v = rng.integer();
+      test.add(k, v);
+      expect(test.find(k)).toBe(v);
+    }
+  },
+);
 
-test('Insert 25 random key value pairs twice with duplicate keys and different values', () => {
-  let keyRng = new PcgRandom(42);
-  let valRng = new PcgRandom(24);
-  const test = new BPlusTree<number, number>();
-  for (let i = 0; i < 25; i++) {
-    test.add(keyRng.integer(), valRng.integer());
-  }
+test.each([25, 50, 100, 250, 500, 1000])(
+  'Insert %i random key value pairs twice with duplicate keys and different values',
+  (total: number) => {
+    let keyRng = new PcgRandom(total);
+    let valRng = new PcgRandom(keyRng.integer());
+    const test = new BPlusTree<number, number>();
+    for (let i = 0; i < total; i++) {
+      test.add(keyRng.integer(), valRng.integer());
+    }
 
-  keyRng = new PcgRandom(42);
-  valRng = new PcgRandom(4242);
-  for (let i = 0; i < 25; i++) {
-    test.add(keyRng.integer(), valRng.integer());
-  }
+    keyRng = new PcgRandom(total);
+    valRng = new PcgRandom(keyRng.integer());
+    for (let i = 0; i < total; i++) {
+      test.add(keyRng.integer(), valRng.integer());
+    }
 
-  keyRng = new PcgRandom(42);
-  valRng = new PcgRandom(4242);
-  for (let i = 0; i < 25; i++) {
-    expect(test.find(keyRng.integer())).toBe(valRng.integer());
-  }
-});
-
-test('Insert 50 sequential keys with sequential value pairs, immediate check', () => {
-  const total = 50;
-  const test = new BPlusTree<number, number>();
-  for (let i = 0; i < total; i++) {
-    test.add(i, i);
-    expect(test.find(i)).toBe(i);
-  }
-});
-
-test('Insert 50 random keys with random value pairs, immediate check', () => {
-  const total = 50;
-  const rng = new PcgRandom(42);
-  const test = new BPlusTree<number, number>();
-  for (let i = 0; i < total; i++) {
-    const k = rng.integer() % 500;
-    const v = rng.integer() % 500;
-    test.add(k, v);
-    expect(test.find(k)).toBe(v);
-  }
-});
-
-test('Insert 100 sequential keys with sequential value pairs, immediate check', () => {
-  const total = 100;
-  const test = new BPlusTree<number, number>();
-  for (let i = 0; i < total; i++) {
-    test.add(i, i);
-    expect(test.find(i)).toBe(i);
-  }
-});
-
-test('Insert 100 random keys with random value pairs, immediate check', () => {
-  const total = 100;
-  const rng = new PcgRandom(42);
-  const test = new BPlusTree<number, number>();
-  for (let i = 0; i < total; i++) {
-    const k = rng.integer() % 500;
-    const v = rng.integer() % 500;
-    test.add(k, v);
-    expect(test.find(k)).toBe(v);
-  }
-});
-
-test('Insert 1000 sequential keys with random value pairs', () => {
-  const total = 1000;
-  let rng = new PcgRandom(42);
-  const test = new BPlusTree<number, number>();
-  for (let i = 0; i < total; i++) {
-    test.add(i, rng.integer() % 5000);
-  }
-
-  rng = new PcgRandom(42);
-  for (let i = 0; i < total; i++) {
-    expect(test.find(i)).toBe(rng.integer() % 5000);
-  }
-});
-
-test('Insert 1000 random key value pairs', () => {
-  const total = 1000;
-  let rng = new PcgRandom(42);
-  const test = new BPlusTree<number, number>();
-  for (let i = 0; i < total; i++) {
-    test.add(rng.integer(), rng.integer());
-  }
-
-  rng = new PcgRandom(42);
-  for (let i = 0; i < total; i++) {
-    expect(test.find(rng.integer())).toBe(rng.integer());
-  }
-});
-
-test('Insert 1000 random key value pairs twice with duplicate keys and different values', () => {
-  let keyRng = new PcgRandom(42);
-  let valRng = new PcgRandom(24);
-  const test = new BPlusTree<number, number>();
-  for (let i = 0; i < 1000; i++) {
-    test.add(keyRng.integer(), valRng.integer());
-  }
-
-  keyRng = new PcgRandom(42);
-  valRng = new PcgRandom(4242);
-  for (let i = 0; i < 1000; i++) {
-    test.add(keyRng.integer(), valRng.integer());
-  }
-
-  keyRng = new PcgRandom(42);
-  valRng = new PcgRandom(4242);
-  for (let i = 0; i < 1000; i++) {
-    expect(test.find(keyRng.integer())).toBe(valRng.integer());
-  }
-});
+    keyRng = new PcgRandom(total);
+    valRng = new PcgRandom(keyRng.integer());
+    for (let i = 0; i < total; i++) {
+      expect(test.find(keyRng.integer())).toBe(valRng.integer());
+    }
+  },
+);
 
 test('Generate DOT graph string', () => {
   const total = 50;
