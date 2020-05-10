@@ -16,7 +16,7 @@ export class BPlusTree<K, V> {
       this._storage = new MemoryStorage();
     }
     if (idGenerator === undefined) {
-      let nextId = 9900001;
+      let nextId = 99000000 + Math.random() * 10000000;
       this._idGenerator = () => {
         return nextId++;
       };
