@@ -216,48 +216,6 @@ export class BPlusTree<K, V> {
     }
   }
 
-  private toDOTInternal(node: any, str: string): string {
-    if (node.pointers === undefined && node.nodeId === undefined) {
-      str += `n${node.id} [color=blue, label="<n>C${node.id}|[${node.key},${node.value}]"]\n`;
-      return str;
-    }
-
-    if (node.nodeId !== undefined) {
-      str += `n${node.id} [fillcolor="#dddddd", style=filled, label="<n>C${node.id}"]\n`;
-      str += `n${node.id} -> n${node.nodeId}\n`;
-      const next = this._storage.get(node.nodeId);
-      str = this.toDOTInternal(next, str);
-    }
-
-    if (node.pointers !== undefined) {
-      let fieldStr = '';
-      let i = 0;
-      if (node.isLeaf) {
-        node.entries.forEach((d: Entry<K, V>) => {
-          fieldStr += `|<c${i++}>[${d.key},${d.value == null ? '*' : d.value}]`;
-        });
-        node.pointers.forEach((cId: Pointer<K>) => {
-          const child = this.loadNode(cId.nodeId);
-          str += `n${node.id}:c${i} -> n${cId.nodeId}\n`;
-          str = this.toDOTInternal(child, str);
-        });
-      } else {
-        node.pointers.forEach((cId: Pointer<K>) => {
-          const child = this.loadNode(cId.nodeId);
-          str += `n${node.id}:c${i} -> n${cId.nodeId}\n`;
-          fieldStr += `|<c${i++}>${cId.key == null ? '*' : cId.key}`;
-          str = this.toDOTInternal(child, str);
-        });
-      }
-
-      str += `n${node.id} [fillcolor="${node.isLeaf ? '#ffddff' : '#ffffdd'}", style=filled, label="<n>N${
-        node.id
-      }${fieldStr}"]\n`;
-    }
-
-    return str;
-  }
-
   private getChildIndex(key: K, node: Node<K, V>): { index: number; found: boolean } {
     let comparison: number;
     let index: number;
