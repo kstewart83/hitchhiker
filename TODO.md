@@ -17,6 +17,7 @@ This document tracks the goals and tasks for each major and minor release of thi
 ### Tasks
 
 `.M--I--T--D.` <br/>
+`[ ][ ][ ][ ] [0.0.3]` Use serialized node length for splitting/joining versus element number <br/>
 `[-][x][x][-] [0.0.3]` Allow for arbitrary external identifiers <br/>
 
 `[-][x][x][-] [0.0.2]` Serialize/Deserialize nodes <br/>
@@ -33,5 +34,4 @@ This document tracks the goals and tasks for each major and minor release of thi
 `[ ][ ][ ][ ]` Support `delete` operation <br/>
 `[ ][ ][ ][ ]` Implement copy-on-write <br/>
 `[ ][ ][ ][ ]` Use cryptographic hash of node contents as ID <br/>
-`[ ][ ][ ][ ]` Use serialized node length for splitting/joining versus element number <br/>
 `[ ][ ][ ][ ]` Create custom Node encoder/decoders for CBOR processor <br/>
