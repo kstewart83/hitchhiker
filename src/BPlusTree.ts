@@ -160,7 +160,7 @@ export class BPlusTree<K, V> {
     const nodeBuf = this.serializeNode(node);
 
     // if adding a new item fills the node, split it
-    if (nodeBuf.length > this._storage.maxNodeSize() - 1) {
+    if (nodeBuf.length > this._storage.maxNodeSize()) {
       if (path === undefined) {
         throw new Error('Must provide path if node exceeds max size');
       }
