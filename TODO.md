@@ -17,11 +17,14 @@ This document tracks the goals and tasks for each major and minor release of thi
 ### Tasks
 
 `.M--I--T--D.` <br/>
+`[-][x][x][-] [0.0.3]` Allow for arbitrary external identifiers <br/>
+
 `[-][x][x][-] [0.0.2]` Serialize/Deserialize nodes <br/>
 `[-][x][x][-] [0.0.2]` Create interface abstraction between tree operations and storage operations <br/>
 `[-][x][x][-] [0.0.2]` Create in-memory implementation of storage abstraction <br/>
 `[-][x][x][o] [0.0.2]` Externalize leaf node data structures <br/>
 `[-][x][x][o] [0.0.2]` Externalize internal node data structures <br/>
+
 `[-][x][o][x] [0.0.1]` Get basic project structure in place <br/>
 `[-][x][x][x] [0.0.1]` Get basic B+ tree working with in memory allocations <br/>
 
@@ -29,4 +32,6 @@ This document tracks the goals and tasks for each major and minor release of thi
 `[ ][ ][ ][ ]` Create DynamoDB implementation of storage abstraction <br/>
 `[ ][ ][ ][ ]` Support `delete` operation <br/>
 `[ ][ ][ ][ ]` Implement copy-on-write <br/>
-`[ ][ ][ ][ ]` Allow for arbitrary external identifiers <br/>
+`[ ][ ][ ][ ]` Use cryptographic hash of node contents as ID <br/>
+`[ ][ ][ ][ ]` Use serialized node length for splitting/joining versus element number <br/>
+`[ ][ ][ ][ ]` Create custom Node encoder/decoders for CBOR processor <br/>
