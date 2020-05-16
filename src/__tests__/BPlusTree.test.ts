@@ -45,7 +45,7 @@ test('Find keys after two adds, reverse order', () => {
   expect(test.find(1)).toBe(1);
 });
 
-test.each([25, 50, 100, 250, 500, 1000])(
+test.each([25, 50, 100, 500])(
   'Insert %d sequential keys with sequential value pairs, immediate check',
   (total: number) => {
     const test = new BPlusTree<number, number>();
@@ -56,20 +56,87 @@ test.each([25, 50, 100, 250, 500, 1000])(
   },
 );
 
-test.each([25, 50])('Insert %d sequential keys with sequential value pairs, then delete all keys', (total: number) => {
-  const test = new BPlusTree<number, number>();
-  for (let i = 0; i < total; i++) {
-    test.add(i, i);
-    const str = test.toDOT();
-  }
+test.each([25, 50, 100, 500])(
+  'Insert %d sequential keys with sequential value pairs, then sequentially delete all keys',
+  (total: number) => {
+    const test = new BPlusTree<number, number>();
+    for (let i = 0; i < total; i++) {
+      test.add(i, i);
+    }
 
-  for (let i = 0; i < total; i++) {
-    const result = test.delete(i);
-    const str = test.toDOT();
-    expect(result).toBe(i);
-    expect(test.find(i)).toBeUndefined();
-  }
-});
+    for (let i = 0; i < total; i++) {
+      const result = test.delete(i);
+      expect(result).toBe(i);
+      expect(test.find(i)).toBeUndefined();
+    }
+  },
+);
+
+test.each([25, 50, 100, 500])(
+  'Insert %d sequential keys with sequential value pairs, then delete all keys in reverse order',
+  (total: number) => {
+    const test = new BPlusTree<number, number>();
+    for (let i = 0; i < total; i++) {
+      test.add(i, i);
+    }
+
+    for (let i = total - 1; i >= 0; i--) {
+      const result = test.delete(i);
+      expect(result).toBe(i);
+      expect(test.find(i)).toBeUndefined();
+    }
+  },
+);
+
+test.each([25, 50, 100, 500])(
+  'Insert %d sequential keys with sequential value pairs, then delete all keys in random order',
+  (total: number) => {
+    const test = new BPlusTree<number, number>();
+    const entries: any = {};
+    const rng = new PcgRandom(total);
+    for (let i = 0; i < total; i++) {
+      entries[i] = i;
+      test.add(i, i);
+    }
+
+    for (let i = total - 1; i >= 0; i--) {
+      const keys = Object.keys(entries);
+      const nextIndex = rng.integer(keys.length);
+      const nextKey = parseInt(keys[nextIndex], 10);
+      const nextValue = entries[nextKey];
+      const result = test.delete(nextKey);
+      expect(result).toBe(nextValue);
+      expect(test.find(nextKey)).toBeUndefined();
+      delete entries[nextKey];
+    }
+  },
+);
+
+test.each([25, 50, 100, 250, 500])(
+  'Insert %d random key/value pairs, then delete all keys in random order',
+  (total: number) => {
+    const test = new BPlusTree<number, number>();
+    const entries: any = {};
+    const rng = new PcgRandom(total);
+    for (let i = 0; i < total; i++) {
+      const k = rng.integer() % 250;
+      const v = rng.integer() % 250;
+      entries[k] = v;
+      test.add(k, v);
+    }
+
+    for (let i = total - 1; i >= 0; i--) {
+      const keys = Object.keys(entries);
+      const nextIndex = rng.integer(keys.length);
+      const nextKey = parseInt(keys[nextIndex], 10);
+      const nextValue = entries[nextKey];
+      const result = test.delete(nextKey);
+      expect(result).toBe(nextValue);
+      expect(test.find(nextKey)).toBeUndefined();
+      delete entries[nextKey];
+    }
+  },
+);
 
 test.each([25, 50, 100, 250, 500, 1000])('Insert %i sequential keys with random value pairs', (total: number) => {
   let rng = new PcgRandom(total);
@@ -94,6 +161,31 @@ test.each([25, 50, 100, 250, 500, 1000])(
       const v = rng.integer();
       test.add(k, v);
       expect(test.find(k)).toBe(v);
+    }
+  },
+);
+
+test.each([25, 50, 100, 250, 500, 1000])(
+  'Insert %d random keys with random value pairs, delete keys in insertion order',
+  (total: number) => {
+    let rng = new PcgRandom(total);
+    let str = '';
+    const test = new BPlusTree<number, number>();
+    for (let i = 0; i < total; i++) {
+      const k = rng.integer();
+      const v = rng.integer();
+      test.add(k, v);
+      expect(test.find(k)).toBe(v);
+    }
+
+    rng = new PcgRandom(total);
+    for (let i = 0; i < total; i++) {
+      const k = rng.integer();
+      const v = rng.integer();
+      const result = test.delete(k);
+      str = test.toDOT();
+      expect(result).toBe(v);
+      expect(test.find(k)).toBeUndefined();
     }
   },
 );

@@ -5,5 +5,11 @@
   "testRegex": "(/__tests__/.*|(\\.|/)(test|spec))\\.(jsx?|tsx?)$",
   "moduleFileExtensions": ["ts", "tsx", "js", "jsx", "json", "node"],
   "coverageDirectory": "coverage",
-  "collectCoverageFrom": ["src/**/*.{ts,js}", "!src/**/*.d.ts"]
+  "collectCoverageFrom": ["src/**/*.{ts,js}", "!src/**/*.d.ts"],
+  "testTimeout": 2147483646,
+  "globals": {
+    "ts-jest": {
+      "tsConfig": "<rootDir>/src/__tests__/tsconfig.json"
+    }
+  }
 }
