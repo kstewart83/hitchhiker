@@ -1,4 +1,4 @@
-import { IReferenceStorage, MetaNode } from './Interfaces';
+import { IReferenceStorage } from './Interfaces';
 import BPlusTree from './BPlusTree';
 
 export class MemoryStorage implements IReferenceStorage {
