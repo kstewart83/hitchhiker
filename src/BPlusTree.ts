@@ -637,7 +637,7 @@ export class BPlusTree<K, V> {
 
     if (path.length > 0) {
       const parent = path[path.length - 1].node;
-      const { index } = await this.getChildIndex(midKey, parent);
+      const { index } = this.getChildIndex(midKey, parent);
       parent.pointers.splice(index, 0, { key: midKey, nodeId: node.id });
       parent.pointers[index + 1].nodeId = newNode.id;
 
