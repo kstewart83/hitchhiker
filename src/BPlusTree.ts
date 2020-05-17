@@ -232,7 +232,7 @@ export class BPlusTree<K, V> {
     if (this._metadata === undefined) {
       throw new Error('Root is not defined');
     }
-    const nodeBuf = await this.serializeNode(this._metadata);
+    const nodeBuf = await this.serializeMetaNode(this._metadata);
     await this._storage.putMetadata(nodeBuf);
   }
 
@@ -240,7 +240,7 @@ export class BPlusTree<K, V> {
     if (this._root === undefined) {
       throw new Error('Root is not defined');
     }
-    const nodeBuf = await this.serializeNode(node);
+    const nodeBuf = await this.serializeDataNode(node);
 
     // if adding a new item fills the node, split it
     if (nodeBuf.length > this._maxNodeSize) {
@@ -290,8 +290,8 @@ export class BPlusTree<K, V> {
       throw new Error('Underflow nodes should have at least one sibling');
     }
 
-    let lowerSerialization = await this.serializeNode(lower);
-    let upperSerialization = await this.serializeNode(upper);
+    let lowerSerialization = await this.serializeDataNode(lower);
+    let upperSerialization = await this.serializeDataNode(upper);
 
     const fillRatio = this._maxNodeSize / this._fillFactor;
     let onlyOneChild = false;
@@ -307,8 +307,8 @@ export class BPlusTree<K, V> {
           lower.entries.push(next);
           const parentEntry = upper.entries[0];
           if (parentEntry === undefined) {
-            lowerSerialization = await this.serializeNode(lower);
-            upperSerialization = await this.serializeNode(upper);
+            lowerSerialization = await this.serializeDataNode(lower);
+            upperSerialization = await this.serializeDataNode(upper);
             break;
           }
           parentElement.node.pointers[parentElement.index].key = parentEntry.key;
@@ -324,8 +324,8 @@ export class BPlusTree<K, V> {
           onlyOneChild = upper.pointers.length <= 1;
         }
 
-        lowerSerialization = await this.serializeNode(lower);
-        upperSerialization = await this.serializeNode(upper);
+        lowerSerialization = await this.serializeDataNode(lower);
+        upperSerialization = await this.serializeDataNode(upper);
       }
 
       if (upperSerialization.length < fillRatio || onlyOneChild) {
@@ -368,8 +368,8 @@ export class BPlusTree<K, V> {
           upper.pointers.unshift(next);
         }
 
-        lowerSerialization = await this.serializeNode(lower);
-        upperSerialization = await this.serializeNode(upper);
+        lowerSerialization = await this.serializeDataNode(lower);
+        upperSerialization = await this.serializeDataNode(upper);
       }
 
       if (lowerSerialization.length < fillRatio || onlyOneChild) {
@@ -451,26 +451,26 @@ export class BPlusTree<K, V> {
     return this._metadata;
   }
 
-  private async serializeNode(node: DataNode<K, V> | MetaNode): Promise<Buffer> {
-    let data: any;
-    if (node.type === NodeType.Data) {
-      const d = node as DataNode<K, V>;
-      if (d.isLeaf) {
-        data = d.entries.map((x) => {
-          return [x.key, x.value];
-        });
-      } else {
-        data = d.pointers.map((x) => {
-          return [x.key, x.nodeId];
-        });
-      }
-      data.unshift(d.isLeaf);
-    } else if (node.type === NodeType.Meta) {
-      const m = node as MetaNode;
-      data = m.rootId;
+  private async serializeMetaNode(node: MetaNode): Promise<Buffer> {
+    const m = node as MetaNode;
+    const data = m.rootId;
+
+    return cbor.encode(node.id, node.type, data);
+  }
+
+  private async serializeDataNode(node: DataNode<K, V>): Promise<Buffer> {
+    let data: any[];
+    const d = node as DataNode<K, V>;
+    if (d.isLeaf) {
+      data = d.entries.map((x) => {
+        return [x.key, x.value];
+      });
     } else {
-      throw new Error('Unknown node type');
+      data = d.pointers.map((x) => {
+        return [x.key, x.nodeId];
+      });
     }
+    data.unshift(d.isLeaf);
 
     return cbor.encode(node.id, node.type, data);
   }

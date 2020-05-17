@@ -211,7 +211,7 @@ test.each([25, 50, 100, 250, 500, 1000])(
   },
 );
 
-test.only('Generate DOT graph string', async () => {
+test('Generate DOT graph string', async () => {
   const total = 500;
   const rng = new PcgRandom(42);
   const test = new BPlusTree<number, number>();
