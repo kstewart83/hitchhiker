@@ -1,20 +1,25 @@
 /* istanbul ignore file */
 import BPlusTree from './BPlusTree';
 import PcgRandom from 'pcg-random';
+import { DynamoStorage } from './DynamoStorage';
 
 export default BPlusTree;
 export { BPlusTree };
 // tslint:disable: no-console
 
-const test = new BPlusTree<number, number>();
+const dynamoStorage = new DynamoStorage('TestTable');
+const test = new BPlusTree<number, number>(dynamoStorage);
 const entries: any = {};
-const total = 1000;
+const total = 50;
 const timings: bigint[] = [];
 const rng = new PcgRandom(total);
 timings.push(process.hrtime.bigint());
 for (let i = 0; i < total; i++) {
   entries[i] = i;
   test.add(i, i);
+  if (i % 10 === 0) {
+    console.log('i = ', i);
+  }
   timings.push(process.hrtime.bigint());
 }
 
@@ -24,6 +29,9 @@ for (let i = total - 1; i >= 0; i--) {
   const nextKey = parseInt(keys[nextIndex], 10);
   const nextValue = entries[nextKey];
   const result = test.delete(nextKey);
+  if (i % 10 === 0) {
+    console.log('i = ', i);
+  }
   if (result !== nextValue) {
     throw new Error();
   }
