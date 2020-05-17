@@ -36,3 +36,4 @@ This document tracks the goals and tasks for each major and minor release of thi
 `[ ][ ][ ][ ]` Implement copy-on-write <br/>
 `[ ][ ][ ][ ]` Use cryptographic hash of node contents as ID <br/>
 `[ ][ ][ ][ ]` Create custom Node encoder/decoders for CBOR processor <br/>
+`[ ][ ][ ][ ]` Make storage interface methods async <br/>
