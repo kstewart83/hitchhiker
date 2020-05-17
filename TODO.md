@@ -17,6 +17,7 @@ This document tracks the goals and tasks for each major and minor release of thi
 ### Tasks
 
 `.M--I--T--D.` <br/>
+`[-][x][x][-] [0.0.4]` Make storage interface methods async <br/>
 `[-][x][x][-] [0.0.4]` Create DynamoDB implementation of storage abstraction <br/>
 
 `[-][x][x][-] [0.0.3]` Support `delete` operation <br/>
@@ -36,4 +37,3 @@ This document tracks the goals and tasks for each major and minor release of thi
 `[ ][ ][ ][ ]` Implement copy-on-write <br/>
 `[ ][ ][ ][ ]` Use cryptographic hash of node contents as ID <br/>
 `[ ][ ][ ][ ]` Create custom Node encoder/decoders for CBOR processor <br/>
-`[ ][ ][ ][ ]` Make storage interface methods async <br/>

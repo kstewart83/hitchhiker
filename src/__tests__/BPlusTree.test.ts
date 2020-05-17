@@ -211,13 +211,13 @@ test.each([25, 50, 100, 250, 500, 1000])(
   },
 );
 
-test('Generate DOT graph string', async () => {
-  const total = 50;
+test.only('Generate DOT graph string', async () => {
+  const total = 500;
   const rng = new PcgRandom(42);
   const test = new BPlusTree<number, number>();
   for (let i = 0; i < total; i++) {
-    const k = rng.integer() % 500;
-    const v = rng.integer() % 500;
+    const k = rng.integer() % 1000;
+    const v = rng.integer() % 1000;
     await test.add(k, v);
     expect(await test.find(k)).toBe(v);
   }

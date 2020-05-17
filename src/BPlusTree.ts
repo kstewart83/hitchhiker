@@ -30,6 +30,9 @@ export class BPlusTree<K, V> {
       this._idGenerator = idGenerator;
     }
     this._comparator = comparator;
+    (async () => {
+      await this.setup();
+    })();
   }
 
   /**
@@ -147,7 +150,9 @@ export class BPlusTree<K, V> {
   private readonly _maxNodeSize: number;
 
   private async blockOnSetup() {
-    await this.setup();
+    while (!this._setupComplete) {
+      await new Promise((r) => setTimeout(r, 1));
+    }
   }
 
   private async setup() {
