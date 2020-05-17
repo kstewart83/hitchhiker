@@ -9,11 +9,11 @@ export { BPlusTree };
 // tslint:disable: no-console
 
 async function main() {
-  // const storage = new DynamoStorage('TestTable');
-  const storage = new MemoryStorage();
+  const storage = new DynamoStorage('TestTable');
+  // const storage = new MemoryStorage();
   const test = new BPlusTree<number, number>(storage);
   const entries: any = {};
-  const total = 100;
+  const total = 1000;
   const timings: bigint[] = [];
   const rng = new PcgRandom(total);
   timings.push(process.hrtime.bigint());

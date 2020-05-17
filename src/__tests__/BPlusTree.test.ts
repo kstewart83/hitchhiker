@@ -45,7 +45,7 @@ test('Find keys after two adds, reverse order', async () => {
   expect(await test.find(1)).toBe(1);
 });
 
-test.each([25, 50, 100, 500])(
+test.each([25, 50, 100, 500, 1000])(
   'Insert %d sequential keys with sequential value pairs, immediate check',
   async (total: number) => {
     const test = new BPlusTree<number, number>();
@@ -56,7 +56,7 @@ test.each([25, 50, 100, 500])(
   },
 );
 
-test.each([25, 50, 100, 500])(
+test.each([25, 50, 100, 500, 1000])(
   'Insert %d sequential keys with sequential value pairs, then sequentially delete all keys',
   async (total: number) => {
     const test = new BPlusTree<number, number>();
@@ -72,7 +72,7 @@ test.each([25, 50, 100, 500])(
   },
 );
 
-test.each([25, 50, 100, 500])(
+test.each([25, 50, 100, 500, 1000])(
   'Insert %d sequential keys with sequential value pairs, then delete all keys in reverse order',
   async (total: number) => {
     const test = new BPlusTree<number, number>();
@@ -88,7 +88,7 @@ test.each([25, 50, 100, 500])(
   },
 );
 
-test.each([25, 50, 100, 500])(
+test.each([25, 50, 100, 500, 1000])(
   'Insert %d sequential keys with sequential value pairs, then delete all keys in random order',
   async (total: number) => {
     const test = new BPlusTree<number, number>();
@@ -112,7 +112,7 @@ test.each([25, 50, 100, 500])(
   },
 );
 
-test.each([25, 50, 100, 250, 500])(
+test.each([25, 50, 100, 250, 500, 1000])(
   'Insert %d random key/value pairs, then delete all keys in random order',
   async (total: number) => {
     const test = new BPlusTree<number, number>();

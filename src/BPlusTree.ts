@@ -1,7 +1,7 @@
 import { DataNode, IReferenceStorage, Node, NodeType, MetaNode, PathElement } from './Interfaces';
 import MemoryStorage from './MemoryStorage';
 import * as cbor from 'cbor';
-import { ServerlessApplicationRepository } from 'aws-sdk';
+import { SHA3 } from 'sha3';
 
 export class BPlusTree<K, V> {
   /*** PUBLIC ***/
@@ -173,6 +173,22 @@ export class BPlusTree<K, V> {
     this._setupComplete = true;
   }
 
+  private async setHash(node: Node) {
+    if (node.serialization === undefined) {
+      if (node.type === NodeType.Data) {
+        node.serialization = await this.serializeDataNode(node as DataNode<K, V>);
+      } else if (node.type === NodeType.Meta) {
+        node.serialization = await this.serializeMetaNode(node as MetaNode);
+      } else {
+        throw new Error('Unknown node type');
+      }
+    }
+
+    const hash = new SHA3(256);
+    hash.update(node.serialization);
+    node.hash = hash.digest().slice(0, 16);
+  }
+
   private async metaNodeToDOT(node: MetaNode, internalId: number): Promise<string> {
     let str = `tree -> n${internalId}\n`;
     if (this._storage instanceof MemoryStorage) {
@@ -240,10 +256,12 @@ export class BPlusTree<K, V> {
     if (this._root === undefined) {
       throw new Error('Root is not defined');
     }
-    const nodeBuf = await this.serializeDataNode(node);
+    if (node.serialization === undefined) {
+      node.serialization = await this.serializeDataNode(node);
+    }
 
     // if adding a new item fills the node, split it
-    if (nodeBuf.length > this._maxNodeSize) {
+    if (node.serialization.length > this._maxNodeSize) {
       // overflow, need to split
       if (path === undefined) {
         throw new Error('Must provide path if node exceeds max size');
@@ -261,14 +279,15 @@ export class BPlusTree<K, V> {
       };
       await this.storeMetadata();
       await this._storage.free(oldRootId);
-    } else if (this._root.id !== node.id && nodeBuf.length < this._maxNodeSize / this._fillFactor) {
+    } else if (this._root.id !== node.id && node.serialization.length < this._maxNodeSize / this._fillFactor) {
       // a node as underflowed, need to borrow/merge with siblings
       if (path === undefined) {
         throw new Error('Must provide path if node is less than minimum size');
       }
       await this.underflow(node, path);
     } else {
-      await this._storage.put(node.id, nodeBuf);
+      await this.setHash(node);
+      await this._storage.put(node.id, node.serialization);
     }
   }
 
@@ -290,15 +309,15 @@ export class BPlusTree<K, V> {
       throw new Error('Underflow nodes should have at least one sibling');
     }
 
-    let lowerSerialization = await this.serializeDataNode(lower);
-    let upperSerialization = await this.serializeDataNode(upper);
+    lower.serialization = await this.serializeDataNode(lower);
+    upper.serialization = await this.serializeDataNode(upper);
 
     const fillRatio = this._maxNodeSize / this._fillFactor;
     let onlyOneChild = false;
 
-    if (lowerSerialization.length < fillRatio) {
+    if (lower.serialization.length < fillRatio) {
       // need to flow elements high to low
-      while (lowerSerialization.length < fillRatio && upperSerialization.length >= fillRatio) {
+      while (lower.serialization.length < fillRatio && upper.serialization.length >= fillRatio) {
         if (node.isLeaf) {
           const next = upper.entries.shift();
           if (next === undefined) {
@@ -307,8 +326,8 @@ export class BPlusTree<K, V> {
           lower.entries.push(next);
           const parentEntry = upper.entries[0];
           if (parentEntry === undefined) {
-            lowerSerialization = await this.serializeDataNode(lower);
-            upperSerialization = await this.serializeDataNode(upper);
+            lower.serialization = await this.serializeDataNode(lower);
+            upper.serialization = await this.serializeDataNode(upper);
             break;
           }
           parentElement.node.pointers[parentElement.index].key = parentEntry.key;
@@ -324,16 +343,16 @@ export class BPlusTree<K, V> {
           onlyOneChild = upper.pointers.length <= 1;
         }
 
-        lowerSerialization = await this.serializeDataNode(lower);
-        upperSerialization = await this.serializeDataNode(upper);
+        lower.serialization = await this.serializeDataNode(lower);
+        upper.serialization = await this.serializeDataNode(upper);
       }
 
-      if (upperSerialization.length < fillRatio || onlyOneChild) {
+      if (upper.serialization.length < fillRatio || onlyOneChild) {
         this.merge(node, lower, upper, path);
       }
-    } else if (upperSerialization.length < fillRatio) {
+    } else if (upper.serialization.length < fillRatio) {
       // need to flow elements low to high
-      while (upperSerialization.length < fillRatio && lowerSerialization.length >= fillRatio) {
+      while (upper.serialization.length < fillRatio && lower.serialization.length >= fillRatio) {
         if (node.isLeaf) {
           const next = lower.entries.pop();
           if (next === undefined) {
@@ -368,11 +387,11 @@ export class BPlusTree<K, V> {
           upper.pointers.unshift(next);
         }
 
-        lowerSerialization = await this.serializeDataNode(lower);
-        upperSerialization = await this.serializeDataNode(upper);
+        lower.serialization = await this.serializeDataNode(lower);
+        upper.serialization = await this.serializeDataNode(upper);
       }
 
-      if (lowerSerialization.length < fillRatio || onlyOneChild) {
+      if (lower.serialization.length < fillRatio || onlyOneChild) {
         this.merge(node, lower, upper, path);
       }
     } else {

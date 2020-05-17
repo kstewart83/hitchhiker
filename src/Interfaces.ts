@@ -1,6 +1,8 @@
 export interface Node {
   id: number;
   type: NodeType;
+  hash?: Buffer;
+  serialization?: Buffer;
 }
 
 export enum NodeType {
