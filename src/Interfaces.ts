@@ -30,23 +30,17 @@ export interface PathElement<K, V> {
   found: boolean;
 }
 
-export interface IReference<T> {
-  id(): number;
-  serialize(): Buffer;
-  deserialize(buffer: Buffer): T;
-}
-
 export interface MetaNode extends Node {
   rootId: number;
 }
 
 export interface IReferenceStorage {
   maxNodeSize(): number;
-  getMetadata(): Buffer | undefined;
-  putMetadata(meta: Buffer): void;
-  get(id: number): Buffer | undefined;
-  put(id: number, ref: Buffer): void;
-  free(id: number): Buffer | undefined;
+  getMetadata(): Promise<Buffer | undefined>;
+  putMetadata(meta: Buffer): Promise<void>;
+  get(id: number): Promise<Buffer | undefined>;
+  put(id: number, ref: Buffer): Promise<void>;
+  free(id: number): Promise<void>;
   generator(
     count?: number,
   ): Generator<

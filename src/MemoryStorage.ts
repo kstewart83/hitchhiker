@@ -17,22 +17,20 @@ export class MemoryStorage implements IReferenceStorage {
       maxNodeSize() {
         return that._maxNodeSize;
       },
-      getMetadata() {
+      async getMetadata() {
         return that._data[that.IdMapMetadataId];
       },
-      putMetadata(meta: Buffer) {
+      async putMetadata(meta: Buffer) {
         that._data[that.IdMapMetadataId] = meta;
       },
-      get(id: number) {
+      async get(id: number) {
         return that._data[id];
       },
-      put(id: number, ref: Buffer) {
+      async put(id: number, ref: Buffer) {
         that._data[id] = ref;
       },
-      free(id: number): Buffer | undefined {
-        const ref = that._data[id];
+      async free(id: number): Promise<void> {
         delete that._data[id];
-        return ref;
       },
       generator(): Generator<
         {
@@ -55,40 +53,38 @@ export class MemoryStorage implements IReferenceStorage {
     return this._maxNodeSize;
   }
 
-  putMetadata(meta: Buffer): void {
+  async putMetadata(meta: Buffer): Promise<void> {
     this._data[this.DataMetadataId] = meta;
   }
 
-  getMetadata(): Buffer | undefined {
+  async getMetadata(): Promise<Buffer | undefined> {
     return this._data[this.DataMetadataId];
   }
 
-  get(extId: number): Buffer | undefined {
-    const intId = this._extIdMap.find(extId);
+  async get(extId: number): Promise<Buffer | undefined> {
+    const intId = await this._extIdMap.find(extId);
     if (intId === undefined) {
       throw new Error('No internal key exists for external key');
     }
     return this._data[intId];
   }
 
-  put(extId: number, ref: Buffer): void {
-    let intId = this._extIdMap.find(extId);
+  async put(extId: number, ref: Buffer): Promise<void> {
+    let intId = await this._extIdMap.find(extId);
     if (intId === undefined) {
       intId = this._nextId++;
-      this._extIdMap.add(extId, intId);
+      await this._extIdMap.add(extId, intId);
     }
     this._data[intId] = ref;
   }
 
-  free(extId: number): Buffer | undefined {
-    const intId = this._extIdMap.find(extId);
+  async free(extId: number): Promise<void> {
+    const intId = await this._extIdMap.find(extId);
     if (intId === undefined) {
       throw new Error('No internal key exists for external key');
     }
-    const ref = this._data[intId];
     delete this._data[intId];
-    this._extIdMap.delete(extId);
-    return ref;
+    await this._extIdMap.delete(extId);
   }
 
   *generator(count?: number) {

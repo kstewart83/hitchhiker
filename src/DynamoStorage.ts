@@ -1,6 +1,4 @@
 import { IReferenceStorage } from './Interfaces';
-import BPlusTree from './BPlusTree';
-import sp from 'synchronized-promise';
 import AWS from 'aws-sdk';
 import * as path from 'path';
 import dotenv from 'dotenv';
@@ -27,48 +25,23 @@ export class DynamoStorage implements IReferenceStorage {
 
     // Create the DynamoDB service object
     this.ddb = new AWS.DynamoDB({ apiVersion: '2012-08-10' });
-    this.getItem = sp(async (id: number) => {
-      const results = await this.ddb
-        .getItem({
-          TableName: this.TableName,
-          Key: {
-            Index: { S: id.toString() },
-          },
-        })
-        .promise();
-      return results.Item?.Data.B;
-    });
-
-    this.putItem = sp(async (id: number, ref: Buffer) => {
-      await this.ddb
-        .putItem({
-          TableName: this.TableName,
-          Item: {
-            Index: { S: id.toString() },
-            Data: { B: ref },
-          },
-        })
-        .promise();
-    });
-
-    this.deleteItem = sp(async (id: number) => {
-      await this.ddb
-        .deleteItem({
-          TableName: this.TableName,
-          Key: {
-            Index: { S: id.toString() },
-          },
-        })
-        .promise();
-    });
   }
 
   maxNodeSize(): number {
     return this._maxNodeSize;
   }
 
-  getMetadata(): Buffer | undefined {
-    const result = this.getItem(this.DataMetadataId);
+  async getMetadata(): Promise<Buffer | undefined> {
+    const result = (
+      await this.ddb
+        .getItem({
+          TableName: this.TableName,
+          Key: {
+            Index: { S: this.DataMetadataId.toString() },
+          },
+        })
+        .promise()
+    ).Item?.Data.B;
     if (result instanceof Buffer || result === undefined) {
       return result;
     } else {
@@ -76,12 +49,29 @@ export class DynamoStorage implements IReferenceStorage {
     }
   }
 
-  putMetadata(meta: Buffer): void {
-    this.putItem(this.DataMetadataId, meta);
+  async putMetadata(meta: Buffer): Promise<void> {
+    await this.ddb
+      .putItem({
+        TableName: this.TableName,
+        Item: {
+          Index: { S: this.DataMetadataId.toString() },
+          Data: { B: meta },
+        },
+      })
+      .promise();
   }
 
-  get(id: number): Buffer | undefined {
-    const result = this.getItem(id);
+  async get(id: number): Promise<Buffer | undefined> {
+    const result = (
+      await this.ddb
+        .getItem({
+          TableName: this.TableName,
+          Key: {
+            Index: { S: id.toString() },
+          },
+        })
+        .promise()
+    ).Item?.Data.B;
     if (result instanceof Buffer || result === undefined) {
       return result;
     } else {
@@ -89,13 +79,27 @@ export class DynamoStorage implements IReferenceStorage {
     }
   }
 
-  put(id: number, ref: Buffer): void {
-    this.putItem(id, ref);
+  async put(id: number, ref: Buffer): Promise<void> {
+    await this.ddb
+      .putItem({
+        TableName: this.TableName,
+        Item: {
+          Index: { S: id.toString() },
+          Data: { B: ref },
+        },
+      })
+      .promise();
   }
 
-  free(id: number): Buffer | undefined {
-    this.deleteItem(id);
-    return undefined;
+  async free(id: number): Promise<void> {
+    await this.ddb
+      .deleteItem({
+        TableName: this.TableName,
+        Key: {
+          Index: { S: id.toString() },
+        },
+      })
+      .promise();
   }
 
   generator(count?: number | undefined): Generator<{ key: number; buffer: Buffer }, boolean, number> {
@@ -106,7 +110,4 @@ export class DynamoStorage implements IReferenceStorage {
 
   private readonly _maxNodeSize: number;
   private ddb: AWS.DynamoDB;
-  private getItem: (id: number) => any;
-  private deleteItem: (id: number) => any;
-  private putItem: (id: number, ref: Buffer) => void;
 }

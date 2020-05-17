@@ -1,6 +1,7 @@
 import { DataNode, IReferenceStorage, Node, NodeType, MetaNode, PathElement } from './Interfaces';
 import MemoryStorage from './MemoryStorage';
 import * as cbor from 'cbor';
+import { ServerlessApplicationRepository } from 'aws-sdk';
 
 export class BPlusTree<K, V> {
   /*** PUBLIC ***/
@@ -11,6 +12,9 @@ export class BPlusTree<K, V> {
    */
   public constructor(storage?: IReferenceStorage, comparator?: (a: K, b: K) => number, idGenerator?: () => number) {
     this._fillFactor = 4;
+    this._root = undefined;
+    this._metadata = undefined;
+    this._setupComplete = false;
     if (storage) {
       this._storage = storage;
     } else {
@@ -26,20 +30,6 @@ export class BPlusTree<K, V> {
       this._idGenerator = idGenerator;
     }
     this._comparator = comparator;
-    const metadata = this.loadMetadata();
-    if (metadata) {
-      this._metadata = metadata;
-      this._root = this.loadDataNode(metadata.rootId);
-    } else {
-      this._root = { id: this._idGenerator(), type: NodeType.Data, isLeaf: true, pointers: [], entries: [] };
-      this.storeDataNode(this._root);
-      this._metadata = {
-        id: 0,
-        type: NodeType.Meta,
-        rootId: this._root.id,
-      };
-      this.storeMetadata();
-    }
   }
 
   /**
@@ -49,8 +39,14 @@ export class BPlusTree<K, V> {
    * @returns Value associated with search key if it exists (can be null) or undefined
    * if search key is not in tree
    */
-  public find(key: K): V | undefined {
-    const { leaf } = this.findLeaf(key, [], this._root);
+  public async find(key: K): Promise<V | undefined> {
+    if (!this._setupComplete) {
+      await this.blockOnSetup();
+    }
+    if (this._root === undefined) {
+      throw new Error('Root is not defined');
+    }
+    const { leaf } = await this.findLeaf(key, [], this._root);
     const { index, found } = this.getChildIndex(key, leaf);
 
     if (found) {
@@ -67,20 +63,26 @@ export class BPlusTree<K, V> {
    * @param key Key to add to tree
    * @param value Value to add to the key in tree (can be null)
    */
-  public add(key: K, value?: V) {
-    const { path, leaf } = this.findLeaf(key, [], this._root);
+  public async add(key: K, value?: V) {
+    if (!this._setupComplete) {
+      await this.blockOnSetup();
+    }
+    if (this._root === undefined) {
+      throw new Error('Root is not defined');
+    }
+    const { path, leaf } = await this.findLeaf(key, [], this._root);
     const { index, found } = this.getChildIndex(key, leaf);
 
     // if key already exists, overwrite existing value
     if (found) {
       leaf.entries[index].value = value;
-      this.storeDataNode(leaf, path);
+      await this.storeDataNode(leaf, path);
       return;
     }
 
     // otherwise, insert key/value pair based on the returned index
     leaf.entries.splice(index, 0, { key, value });
-    this.storeDataNode(leaf, path);
+    await this.storeDataNode(leaf, path);
   }
 
   /**
@@ -88,37 +90,41 @@ export class BPlusTree<K, V> {
    *
    * @param key Key to delete from tree
    */
-  public delete(key: K): V | undefined {
-    const { path, leaf } = this.findLeaf(key, [], this._root);
-    const { index, found } = this.getChildIndex(key, leaf);
+  public async delete(key: K): Promise<V | undefined> {
+    if (!this._setupComplete) {
+      await this.blockOnSetup();
+    }
+    if (this._root === undefined) {
+      throw new Error('Root is not defined');
+    }
+    const { path, leaf } = await this.findLeaf(key, [], this._root);
+    const { index, found } = await this.getChildIndex(key, leaf);
 
     // if key exists, remove entry
     if (found) {
       const entry = leaf.entries.splice(index, 1)[0];
-      this.storeDataNode(leaf, path);
+      await this.storeDataNode(leaf, path);
       return entry.value;
     } else {
       return undefined;
     }
-
-    return;
   }
 
   /**
    * Convert tree to DOT representation
    */
-  public toDOT(): string {
+  public async toDOT(): Promise<string> {
     let str = '';
     const gen = this._storage.generator();
     let next = gen.next();
     while (!next.done) {
       const nextResult = next.value;
-      const node = this.deserializeNode(nextResult.buffer);
+      const node = await this.deserializeNode(nextResult.buffer);
 
       if (node.type === NodeType.Data) {
-        str += this.dataNodeToDOT(node as DataNode<K, V>, next.value.key);
+        str += await this.dataNodeToDOT(node as DataNode<K, V>, next.value.key);
       } else if (node.type === NodeType.Meta) {
-        str += this.metaNodeToDOT(node as MetaNode, next.value.key);
+        str += await this.metaNodeToDOT(node as MetaNode, next.value.key);
       } else {
         throw new Error('Unknown Node Type');
       }
@@ -129,7 +135,40 @@ export class BPlusTree<K, V> {
     return str;
   }
 
-  private metaNodeToDOT(node: MetaNode, internalId: number): string {
+  /*** PRIVATE ***/
+
+  private _setupComplete: boolean;
+  private _root: DataNode<K, V> | undefined;
+  private _comparator?: (a: K, b: K) => number;
+  private _storage: IReferenceStorage;
+  private _metadata: MetaNode | undefined;
+  private _idGenerator: () => number;
+  private readonly _fillFactor: number;
+  private readonly _maxNodeSize: number;
+
+  private async blockOnSetup() {
+    await this.setup();
+  }
+
+  private async setup() {
+    const metadata = await this.loadMetadata();
+    if (metadata) {
+      this._metadata = metadata;
+      this._root = await this.loadDataNode(metadata.rootId);
+    } else {
+      this._root = { id: this._idGenerator(), type: NodeType.Data, isLeaf: true, pointers: [], entries: [] };
+      await this.storeDataNode(this._root);
+      this._metadata = {
+        id: 0,
+        type: NodeType.Meta,
+        rootId: this._root.id,
+      };
+      await this.storeMetadata();
+    }
+    this._setupComplete = true;
+  }
+
+  private async metaNodeToDOT(node: MetaNode, internalId: number): Promise<string> {
     let str = `tree -> n${internalId}\n`;
     if (this._storage instanceof MemoryStorage) {
       const memStor = this._storage as MemoryStorage;
@@ -147,7 +186,7 @@ export class BPlusTree<K, V> {
     return str;
   }
 
-  private dataNodeToDOT(node: DataNode<K, V>, internalId: number) {
+  private async dataNodeToDOT(node: DataNode<K, V>, internalId: number) {
     let str = '';
     let fieldStr = '';
     let i = 0;
@@ -184,23 +223,19 @@ export class BPlusTree<K, V> {
     return str;
   }
 
-  /*** PRIVATE ***/
-
-  private _root: DataNode<K, V>;
-  private _comparator?: (a: K, b: K) => number;
-  private _storage: IReferenceStorage;
-  private _metadata: MetaNode;
-  private _idGenerator: () => number;
-  private readonly _fillFactor: number;
-  private readonly _maxNodeSize: number;
-
-  private storeMetadata() {
-    const nodeBuf = this.serializeNode(this._metadata);
-    this._storage.putMetadata(nodeBuf);
+  private async storeMetadata() {
+    if (this._metadata === undefined) {
+      throw new Error('Root is not defined');
+    }
+    const nodeBuf = await this.serializeNode(this._metadata);
+    await this._storage.putMetadata(nodeBuf);
   }
 
-  private storeDataNode(node: DataNode<K, V>, path?: PathElement<K, V>[]) {
-    const nodeBuf = this.serializeNode(node);
+  private async storeDataNode(node: DataNode<K, V>, path?: PathElement<K, V>[]) {
+    if (this._root === undefined) {
+      throw new Error('Root is not defined');
+    }
+    const nodeBuf = await this.serializeNode(node);
 
     // if adding a new item fills the node, split it
     if (nodeBuf.length > this._maxNodeSize) {
@@ -208,50 +243,50 @@ export class BPlusTree<K, V> {
       if (path === undefined) {
         throw new Error('Must provide path if node exceeds max size');
       }
-      this.split(node, path);
+      await this.split(node, path);
     } else if (this._root.id === node.id && this._root.pointers.length === 1) {
       // root is down to one child, need to consolidate into new root as leaf
       const oldRootId = this._root.id;
-      const onlyChild = this.loadDataNode(node.pointers[0].nodeId);
+      const onlyChild = await this.loadDataNode(node.pointers[0].nodeId);
       this._root = onlyChild;
       this._metadata = {
         id: 0,
         type: NodeType.Meta,
         rootId: onlyChild.id,
       };
-      this.storeMetadata();
-      this._storage.free(oldRootId);
+      await this.storeMetadata();
+      await this._storage.free(oldRootId);
     } else if (this._root.id !== node.id && nodeBuf.length < this._maxNodeSize / this._fillFactor) {
       // a node as underflowed, need to borrow/merge with siblings
       if (path === undefined) {
         throw new Error('Must provide path if node is less than minimum size');
       }
-      this.underflow(node, path);
+      await this.underflow(node, path);
     } else {
-      this._storage.put(node.id, nodeBuf);
+      await this._storage.put(node.id, nodeBuf);
     }
   }
 
-  private underflow(node: DataNode<K, V>, path: PathElement<K, V>[]) {
+  private async underflow(node: DataNode<K, V>, path: PathElement<K, V>[]) {
     const parentElement = path[path.length - 1];
     const upperSiblingId = parentElement.node.pointers[parentElement.index + 1];
     const lowerSiblingId = parentElement.node.pointers[parentElement.index - 1];
     let upper: DataNode<K, V>;
     let lower: DataNode<K, V>;
     if (upperSiblingId) {
-      const upperSibling = this.loadDataNode(upperSiblingId.nodeId);
+      const upperSibling = await this.loadDataNode(upperSiblingId.nodeId);
       lower = node;
       upper = upperSibling;
     } else if (lowerSiblingId) {
-      const lowerSibling = this.loadDataNode(lowerSiblingId.nodeId);
+      const lowerSibling = await this.loadDataNode(lowerSiblingId.nodeId);
       lower = lowerSibling;
       upper = node;
     } else {
       throw new Error('Underflow nodes should have at least one sibling');
     }
 
-    let lowerSerialization = this.serializeNode(lower);
-    let upperSerialization = this.serializeNode(upper);
+    let lowerSerialization = await this.serializeNode(lower);
+    let upperSerialization = await this.serializeNode(upper);
 
     const fillRatio = this._maxNodeSize / this._fillFactor;
     let onlyOneChild = false;
@@ -267,8 +302,8 @@ export class BPlusTree<K, V> {
           lower.entries.push(next);
           const parentEntry = upper.entries[0];
           if (parentEntry === undefined) {
-            lowerSerialization = this.serializeNode(lower);
-            upperSerialization = this.serializeNode(upper);
+            lowerSerialization = await this.serializeNode(lower);
+            upperSerialization = await this.serializeNode(upper);
             break;
           }
           parentElement.node.pointers[parentElement.index].key = parentEntry.key;
@@ -284,8 +319,8 @@ export class BPlusTree<K, V> {
           onlyOneChild = upper.pointers.length <= 1;
         }
 
-        lowerSerialization = this.serializeNode(lower);
-        upperSerialization = this.serializeNode(upper);
+        lowerSerialization = await this.serializeNode(lower);
+        upperSerialization = await this.serializeNode(upper);
       }
 
       if (upperSerialization.length < fillRatio || onlyOneChild) {
@@ -328,8 +363,8 @@ export class BPlusTree<K, V> {
           upper.pointers.unshift(next);
         }
 
-        lowerSerialization = this.serializeNode(lower);
-        upperSerialization = this.serializeNode(upper);
+        lowerSerialization = await this.serializeNode(lower);
+        upperSerialization = await this.serializeNode(upper);
       }
 
       if (lowerSerialization.length < fillRatio || onlyOneChild) {
@@ -343,17 +378,17 @@ export class BPlusTree<K, V> {
     parentPath.pop();
 
     if (lower.entries.length === 0 && lower.pointers.length === 0) {
-      this._storage.free(lower.id);
+      await this._storage.free(lower.id);
     } else {
-      this.storeDataNode(lower);
+      await this.storeDataNode(lower);
     }
 
     if (upper.entries.length === 0 && upper.pointers.length === 0) {
-      this._storage.free(upper.id);
+      await this._storage.free(upper.id);
     } else {
-      this.storeDataNode(upper);
+      await this.storeDataNode(upper);
     }
-    this.storeDataNode(parentElement.node, parentPath);
+    await this.storeDataNode(parentElement.node, parentPath);
   }
 
   private merge(node: DataNode<K, V>, lower: DataNode<K, V>, upper: DataNode<K, V>, path: PathElement<K, V>[]) {
@@ -378,22 +413,22 @@ export class BPlusTree<K, V> {
     parentElement.node.pointers.splice(parentIndex, 1);
   }
 
-  private loadNode(id: number): Node {
-    const result = this._storage.get(id);
+  private async loadNode(id: number): Promise<Node> {
+    const result = await this._storage.get(id);
     if (result === undefined) {
       throw new Error('Node not in storage');
     }
 
-    return this.deserializeNode(result);
+    return await this.deserializeNode(result);
   }
 
-  private loadDataNode(id: number): DataNode<K, V> {
-    const result = this._storage.get(id);
+  private async loadDataNode(id: number): Promise<DataNode<K, V>> {
+    const result = await this._storage.get(id);
     if (result === undefined) {
       throw new Error('Node not in storage');
     }
 
-    const node = this.deserializeNode(result);
+    const node = await this.deserializeNode(result);
 
     if (node.type === NodeType.Data) {
       return node as DataNode<K, V>;
@@ -402,8 +437,8 @@ export class BPlusTree<K, V> {
     throw new Error('Node ID not associated with metanode');
   }
 
-  private loadMetadata(): MetaNode | undefined {
-    const result = this._storage.getMetadata();
+  private async loadMetadata(): Promise<MetaNode | undefined> {
+    const result = await this._storage.getMetadata();
     if (result === undefined) {
       return result;
     }
@@ -411,7 +446,7 @@ export class BPlusTree<K, V> {
     return this._metadata;
   }
 
-  private serializeNode(node: DataNode<K, V> | MetaNode): Buffer {
+  private async serializeNode(node: DataNode<K, V> | MetaNode): Promise<Buffer> {
     let data: any;
     if (node.type === NodeType.Data) {
       const d = node as DataNode<K, V>;
@@ -435,8 +470,8 @@ export class BPlusTree<K, V> {
     return cbor.encode(node.id, node.type, data);
   }
 
-  private deserializeNode(cborData: Buffer): Node {
-    const decodeArray = cbor.decodeAllSync(cborData);
+  private async deserializeNode(cborData: Buffer): Promise<Node> {
+    const decodeArray = await cbor.decodeAll(cborData);
     const refId = decodeArray[0] as number;
     const refType = decodeArray[1] as number;
     const data = decodeArray[2] as any;
@@ -481,19 +516,19 @@ export class BPlusTree<K, V> {
     }
   }
 
-  private findLeaf(
+  private async findLeaf(
     key: K,
     path: PathElement<K, V>[],
     node: DataNode<K, V>,
-  ): { path: PathElement<K, V>[]; leaf: DataNode<K, V> } {
+  ): Promise<{ path: PathElement<K, V>[]; leaf: DataNode<K, V> }> {
     if (node.isLeaf) {
       return { path, leaf: node };
     } else {
       const { index, found } = this.getChildIndex(key, node);
 
       const childId = node.pointers[index + (found ? 1 : 0)];
-      const child = this.loadDataNode(childId.nodeId);
-      return this.findLeaf(
+      const child = await this.loadDataNode(childId.nodeId);
+      return await this.findLeaf(
         key,
         path.concat({
           node,
@@ -557,7 +592,7 @@ export class BPlusTree<K, V> {
     }
   }
 
-  private split(node: DataNode<K, V>, path: PathElement<K, V>[]) {
+  private async split(node: DataNode<K, V>, path: PathElement<K, V>[]) {
     let midKey: K | null;
     let midIndex: number;
     if (node.isLeaf) {
@@ -588,21 +623,21 @@ export class BPlusTree<K, V> {
       if (newNodeChildId === undefined) {
         throw new Error('Trying to split empty internal node');
       }
-      const newNodeChild = this.loadNode(newNodeChildId.nodeId);
+      const newNodeChild = await this.loadNode(newNodeChildId.nodeId);
       node.pointers.push({ key: null, nodeId: newNodeChild.id });
     }
 
-    this.storeDataNode(newNode, path);
-    this.storeDataNode(node, path);
+    await this.storeDataNode(newNode, path);
+    await this.storeDataNode(node, path);
 
     if (path.length > 0) {
       const parent = path[path.length - 1].node;
-      const { index } = this.getChildIndex(midKey, parent);
+      const { index } = await this.getChildIndex(midKey, parent);
       parent.pointers.splice(index, 0, { key: midKey, nodeId: node.id });
       parent.pointers[index + 1].nodeId = newNode.id;
 
       const newPath = [...path].slice(0, path.length - 1);
-      this.storeDataNode(parent, newPath);
+      await this.storeDataNode(parent, newPath);
     } else {
       this._root = {
         id: this._idGenerator(),
@@ -615,13 +650,13 @@ export class BPlusTree<K, V> {
         entries: [],
       };
 
-      this.storeDataNode(this._root);
+      await this.storeDataNode(this._root);
       this._metadata = {
         id: 0,
         type: NodeType.Meta,
         rootId: this._root.id,
       };
-      this.storeMetadata();
+      await this.storeMetadata();
     }
   }
 
