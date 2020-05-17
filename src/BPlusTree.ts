@@ -101,7 +101,7 @@ export class BPlusTree<K, V> {
       throw new Error('Root is not defined');
     }
     const { path, leaf } = await this.findLeaf(key, [], this._root);
-    const { index, found } = await this.getChildIndex(key, leaf);
+    const { index, found } = this.getChildIndex(key, leaf);
 
     // if key exists, remove entry
     if (found) {
