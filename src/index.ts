@@ -13,7 +13,7 @@ async function main() {
   // const storage = new MemoryStorage();
   const test = new BPlusTree<number, number>(storage);
   const entries: any = {};
-  const total = 1000;
+  const total = 500;
   const timings: bigint[] = [];
   const rng = new PcgRandom(total);
   timings.push(process.hrtime.bigint());
@@ -32,11 +32,14 @@ async function main() {
     const nextKey = parseInt(keys[nextIndex], 10);
     const nextValue = entries[nextKey];
     const result = await test.find(nextKey);
-    if (result !== nextValue) {
-      console.log(`${result} !== ${nextValue}`);
-    }
+
     if (i % 10 === 0) {
-      console.log('r = ', i);
+      // console.log('r = ', i);
+      if (result !== nextValue) {
+        console.log(`${result} !== ${nextValue}`);
+      } else {
+        console.log(`${result} === ${nextValue}`);
+      }
     }
   }
 

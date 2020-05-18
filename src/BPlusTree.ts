@@ -256,9 +256,8 @@ export class BPlusTree<K, V> {
     if (this._root === undefined) {
       throw new Error('Root is not defined');
     }
-    if (node.serialization === undefined) {
-      node.serialization = await this.serializeDataNode(node);
-    }
+
+    node.serialization = await this.serializeDataNode(node);
 
     // if adding a new item fills the node, split it
     if (node.serialization.length > this._maxNodeSize) {
@@ -288,6 +287,7 @@ export class BPlusTree<K, V> {
     } else {
       await this.setHash(node);
       await this._storage.put(node.id, node.serialization);
+      node.serialization = undefined;
     }
   }
 

@@ -7,7 +7,7 @@ export class MemoryStorage implements IReferenceStorage {
   public readonly DataMetadataId = 0;
   public readonly IdMapMetadataId = 1;
 
-  public constructor(nodeSize: number = 4096) {
+  public constructor(nodeSize: number = 64) {
     this._maxNodeSize = nodeSize;
     this._data = {};
     this._nextId = 2;
