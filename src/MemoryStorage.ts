@@ -14,7 +14,7 @@ export class MemoryStorage implements IReferenceStorage {
     const that = this;
 
     const internalBTreeMethods = {
-      maxNodeSize() {
+      maxPageSize() {
         return that._maxNodeSize;
       },
       async getMetadata() {
@@ -49,7 +49,7 @@ export class MemoryStorage implements IReferenceStorage {
     });
   }
 
-  maxNodeSize(): number {
+  maxPageSize(): number {
     return this._maxNodeSize;
   }
 

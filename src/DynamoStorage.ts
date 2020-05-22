@@ -27,7 +27,7 @@ export class DynamoStorage implements IReferenceStorage {
     this.ddb = new AWS.DynamoDB({ apiVersion: '2012-08-10' });
   }
 
-  maxNodeSize(): number {
+  maxPageSize(): number {
     return this._maxNodeSize;
   }
 

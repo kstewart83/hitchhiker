@@ -1,20 +1,4 @@
-export interface Node {
-  id: number;
-  type: NodeType;
-  hash?: Buffer;
-  serialization?: Buffer;
-}
-
-export enum NodeType {
-  Data = 1,
-  Meta = 2,
-}
-
-export interface DataNode<K, V> extends Node {
-  isLeaf: boolean;
-  pointers: Pointer<K>[];
-  entries: Entry<K, V>[];
-}
+import { DataPage } from './DataPage';
 
 export interface Entry<K, V> {
   key: K;
@@ -23,21 +7,17 @@ export interface Entry<K, V> {
 
 export interface Pointer<K> {
   key: K | null;
-  nodeId: number;
+  pageId: number;
 }
 
 export interface PathElement<K, V> {
-  node: DataNode<K, V>;
+  page: DataPage<K, V>;
   index: number;
   found: boolean;
 }
 
-export interface MetaNode extends Node {
-  rootId: number;
-}
-
 export interface IReferenceStorage {
-  maxNodeSize(): number;
+  maxPageSize(): number;
   getMetadata(): Promise<Buffer | undefined>;
   putMetadata(meta: Buffer): Promise<void>;
   get(id: number): Promise<Buffer | undefined>;

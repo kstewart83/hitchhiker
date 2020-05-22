@@ -1,4 +1,7 @@
-import { DataNode, IReferenceStorage, Node, NodeType, MetaNode, PathElement } from './Interfaces';
+import { IReferenceStorage, PathElement } from './Interfaces';
+import { Page, PageType } from './Page';
+import { DataPage } from './DataPage';
+import { MetaPage } from './MetaPage';
 import MemoryStorage from './MemoryStorage';
 import * as cbor from 'cbor';
 import { SHA3 } from 'sha3';
@@ -7,7 +10,7 @@ export class BPlusTree<K, V> {
   /*** PUBLIC ***/
 
   /**
-   * @param branching Branching factor for each node.
+   * @param branching Branching factor for each page.
    * @param comparator Custom compartor for key values
    */
   public constructor(storage?: IReferenceStorage, comparator?: (a: K, b: K) => number, idGenerator?: () => number) {
@@ -20,7 +23,7 @@ export class BPlusTree<K, V> {
     } else {
       this._storage = new MemoryStorage();
     }
-    this._maxNodeSize = this._storage.maxNodeSize();
+    this._maxPageSize = this._storage.maxPageSize();
     if (idGenerator === undefined) {
       let baseId = 900000;
       this._idGenerator = () => {
@@ -79,13 +82,13 @@ export class BPlusTree<K, V> {
     // if key already exists, overwrite existing value
     if (found) {
       leaf.entries[index].value = value;
-      await this.storeDataNode(leaf, path);
+      await this.storeDataPage(leaf, path);
       return;
     }
 
     // otherwise, insert key/value pair based on the returned index
     leaf.entries.splice(index, 0, { key, value });
-    await this.storeDataNode(leaf, path);
+    await this.storeDataPage(leaf, path);
   }
 
   /**
@@ -106,7 +109,7 @@ export class BPlusTree<K, V> {
     // if key exists, remove entry
     if (found) {
       const entry = leaf.entries.splice(index, 1)[0];
-      await this.storeDataNode(leaf, path);
+      await this.storeDataPage(leaf, path);
       return entry.value;
     } else {
       return undefined;
@@ -122,14 +125,14 @@ export class BPlusTree<K, V> {
     let next = gen.next();
     while (!next.done) {
       const nextResult = next.value;
-      const node = await this.deserializeNode(nextResult.buffer);
+      const page = await this.deserializePage(nextResult.buffer);
 
-      if (node.type === NodeType.Data) {
-        str += await this.dataNodeToDOT(node as DataNode<K, V>, next.value.key);
-      } else if (node.type === NodeType.Meta) {
-        str += await this.metaNodeToDOT(node as MetaNode, next.value.key);
+      if (page.type === PageType.Data) {
+        str += await this.DataPageToDOT(page as DataPage<K, V>, next.value.key);
+      } else if (page.type === PageType.Meta) {
+        str += await this.metaPageToDOT(page as MetaPage, next.value.key);
       } else {
-        throw new Error('Unknown Node Type');
+        throw new Error('Unknown Page Type');
       }
 
       next = gen.next();
@@ -141,13 +144,13 @@ export class BPlusTree<K, V> {
   /*** PRIVATE ***/
 
   private _setupComplete: boolean;
-  private _root: DataNode<K, V> | undefined;
+  private _root: DataPage<K, V> | undefined;
   private _comparator?: (a: K, b: K) => number;
   private _storage: IReferenceStorage;
-  private _metadata: MetaNode | undefined;
+  private _metadata: MetaPage | undefined;
   private _idGenerator: () => number;
   private readonly _fillFactor: number;
-  private readonly _maxNodeSize: number;
+  private readonly _maxPageSize: number;
 
   private async blockOnSetup() {
     while (!this._setupComplete) {
@@ -159,13 +162,13 @@ export class BPlusTree<K, V> {
     const metadata = await this.loadMetadata();
     if (metadata) {
       this._metadata = metadata;
-      this._root = await this.loadDataNode(metadata.rootId);
+      this._root = await this.loadDataPage(metadata.rootId);
     } else {
-      this._root = { id: this._idGenerator(), type: NodeType.Data, isLeaf: true, pointers: [], entries: [] };
-      await this.storeDataNode(this._root);
+      this._root = { id: this._idGenerator(), type: PageType.Data, isLeaf: true, pointers: [], entries: [] };
+      await this.storeDataPage(this._root);
       this._metadata = {
         id: 0,
-        type: NodeType.Meta,
+        type: PageType.Meta,
         rootId: this._root.id,
       };
       await this.storeMetadata();
@@ -173,23 +176,23 @@ export class BPlusTree<K, V> {
     this._setupComplete = true;
   }
 
-  private async setHash(node: Node) {
-    if (node.serialization === undefined) {
-      if (node.type === NodeType.Data) {
-        node.serialization = await this.serializeDataNode(node as DataNode<K, V>);
-      } else if (node.type === NodeType.Meta) {
-        node.serialization = await this.serializeMetaNode(node as MetaNode);
+  private async setHash(page: Page) {
+    if (page.serialization === undefined) {
+      if (page.type === PageType.Data) {
+        page.serialization = await this.serializeDataPage(page as DataPage<K, V>);
+      } else if (page.type === PageType.Meta) {
+        page.serialization = await this.serializeMetaPage(page as MetaPage);
       } else {
-        throw new Error('Unknown node type');
+        throw new Error('Unknown page type');
       }
     }
 
     const hash = new SHA3(256);
-    hash.update(node.serialization);
-    node.hash = hash.digest().slice(0, 16);
+    hash.update(page.serialization);
+    page.hash = hash.digest().slice(0, 16);
   }
 
-  private async metaNodeToDOT(node: MetaNode, internalId: number): Promise<string> {
+  private async metaPageToDOT(page: MetaPage, internalId: number): Promise<string> {
     let str = `tree -> n${internalId}\n`;
     if (this._storage instanceof MemoryStorage) {
       const memStor = this._storage as MemoryStorage;
@@ -198,34 +201,34 @@ export class BPlusTree<K, V> {
       } else if (internalId === memStor.IdMapMetadataId) {
         str += `n${internalId} [label="ID Map"]\n`;
       } else {
-        str += `n${internalId} [label="M${node.id}:I${internalId}"]\n`;
+        str += `n${internalId} [label="M${page.id}:I${internalId}"]\n`;
       }
     } else {
-      str += `n${internalId} [label="M${node.id}:I${internalId}"]\n`;
+      str += `n${internalId} [label="M${page.id}:I${internalId}"]\n`;
     }
-    str += `n${internalId} -> n${node.rootId}\n`;
+    str += `n${internalId} -> n${page.rootId}\n`;
     return str;
   }
 
-  private async dataNodeToDOT(node: DataNode<K, V>, internalId: number) {
+  private async DataPageToDOT(page: DataPage<K, V>, internalId: number) {
     let str = '';
     let fieldStr = '';
     let i = 0;
     let fillColor = '';
-    if (node.id > 9900000) {
-      fillColor = `fillcolor="${node.isLeaf ? '#ddffff' : '#ffffdd'}"`;
+    if (page.id > 9900000) {
+      fillColor = `fillcolor="${page.isLeaf ? '#ddffff' : '#ffffdd'}"`;
     } else {
-      fillColor = `fillcolor="${node.isLeaf ? '#88ffff' : '#ffff88'}"`;
+      fillColor = `fillcolor="${page.isLeaf ? '#88ffff' : '#ffff88'}"`;
     }
-    if (node.isLeaf) {
+    if (page.isLeaf) {
       fieldStr += `
   <table border="0" cellborder="1" cellspacing="0">
-    <tr><td cellborder="1" bgcolor="#eeffff"><b>E${node.id}:I${internalId}</b></td></tr>
+    <tr><td cellborder="1" bgcolor="#eeffff"><b>E${page.id}:I${internalId}</b></td></tr>
     <hr/>
     <tr><td border="0" >
       <table cellspacing='0'>
         <tr><td bgcolor="#88ffcc"><b>K</b></td><td bgcolor="#88ffcc"><b>V</b></td></tr>        `;
-      node.entries.forEach((d) => {
+      page.entries.forEach((d) => {
         fieldStr += `        <tr><td>${d.key}</td><td>${d.value == null ? '*' : d.value}`;
         fieldStr += `</td></tr>\n`;
       });
@@ -233,13 +236,13 @@ export class BPlusTree<K, V> {
       </table>
     </td></tr>
   </table>`;
-      str += `n${node.id} [${fillColor}, style=filled, label=<${fieldStr}>];\n`;
+      str += `n${page.id} [${fillColor}, style=filled, label=<${fieldStr}>];\n`;
     } else {
-      node.pointers.forEach((cId) => {
-        str += `n${node.id}:c${i} -> n${cId.nodeId}\n`;
+      page.pointers.forEach((cId) => {
+        str += `n${page.id}:c${i} -> n${cId.pageId}\n`;
         fieldStr += `|<c${i++}>${cId.key == null ? '*' : cId.key}`;
       });
-      str += `n${node.id} [${fillColor}, style=filled, label="E${node.id}:I${internalId}${fieldStr}"]\n`;
+      str += `n${page.id} [${fillColor}, style=filled, label="E${page.id}:I${internalId}${fieldStr}"]\n`;
     }
     return str;
   }
@@ -248,77 +251,77 @@ export class BPlusTree<K, V> {
     if (this._metadata === undefined) {
       throw new Error('Root is not defined');
     }
-    const nodeBuf = await this.serializeMetaNode(this._metadata);
-    await this._storage.putMetadata(nodeBuf);
+    const pageBuf = await this.serializeMetaPage(this._metadata);
+    await this._storage.putMetadata(pageBuf);
   }
 
-  private async storeDataNode(node: DataNode<K, V>, path?: PathElement<K, V>[]) {
+  private async storeDataPage(page: DataPage<K, V>, path?: PathElement<K, V>[]) {
     if (this._root === undefined) {
       throw new Error('Root is not defined');
     }
 
-    node.serialization = await this.serializeDataNode(node);
+    page.serialization = await this.serializeDataPage(page);
 
-    // if adding a new item fills the node, split it
-    if (node.serialization.length > this._maxNodeSize) {
+    // if adding a new item fills the page, split it
+    if (page.serialization.length > this._maxPageSize) {
       // overflow, need to split
       if (path === undefined) {
-        throw new Error('Must provide path if node exceeds max size');
+        throw new Error('Must provide path if page exceeds max size');
       }
-      await this.split(node, path);
-    } else if (this._root.id === node.id && this._root.pointers.length === 1) {
+      await this.split(page, path);
+    } else if (this._root.id === page.id && this._root.pointers.length === 1) {
       // root is down to one child, need to consolidate into new root as leaf
       const oldRootId = this._root.id;
-      const onlyChild = await this.loadDataNode(node.pointers[0].nodeId);
+      const onlyChild = await this.loadDataPage(page.pointers[0].pageId);
       this._root = onlyChild;
       this._metadata = {
         id: 0,
-        type: NodeType.Meta,
+        type: PageType.Meta,
         rootId: onlyChild.id,
       };
       await this.storeMetadata();
       await this._storage.free(oldRootId);
-    } else if (this._root.id !== node.id && node.serialization.length < this._maxNodeSize / this._fillFactor) {
-      // a node as underflowed, need to borrow/merge with siblings
+    } else if (this._root.id !== page.id && page.serialization.length < this._maxPageSize / this._fillFactor) {
+      // a page as underflowed, need to borrow/merge with siblings
       if (path === undefined) {
-        throw new Error('Must provide path if node is less than minimum size');
+        throw new Error('Must provide path if page is less than minimum size');
       }
-      await this.underflow(node, path);
+      await this.underflow(page, path);
     } else {
-      await this.setHash(node);
-      await this._storage.put(node.id, node.serialization);
-      node.serialization = undefined;
+      await this.setHash(page);
+      await this._storage.put(page.id, page.serialization);
+      page.serialization = undefined;
     }
   }
 
-  private async underflow(node: DataNode<K, V>, path: PathElement<K, V>[]) {
+  private async underflow(page: DataPage<K, V>, path: PathElement<K, V>[]) {
     const parentElement = path[path.length - 1];
-    const upperSiblingId = parentElement.node.pointers[parentElement.index + 1];
-    const lowerSiblingId = parentElement.node.pointers[parentElement.index - 1];
-    let upper: DataNode<K, V>;
-    let lower: DataNode<K, V>;
+    const upperSiblingId = parentElement.page.pointers[parentElement.index + 1];
+    const lowerSiblingId = parentElement.page.pointers[parentElement.index - 1];
+    let upper: DataPage<K, V>;
+    let lower: DataPage<K, V>;
     if (upperSiblingId) {
-      const upperSibling = await this.loadDataNode(upperSiblingId.nodeId);
-      lower = node;
+      const upperSibling = await this.loadDataPage(upperSiblingId.pageId);
+      lower = page;
       upper = upperSibling;
     } else if (lowerSiblingId) {
-      const lowerSibling = await this.loadDataNode(lowerSiblingId.nodeId);
+      const lowerSibling = await this.loadDataPage(lowerSiblingId.pageId);
       lower = lowerSibling;
-      upper = node;
+      upper = page;
     } else {
-      throw new Error('Underflow nodes should have at least one sibling');
+      throw new Error('Underflow pages should have at least one sibling');
     }
 
-    lower.serialization = await this.serializeDataNode(lower);
-    upper.serialization = await this.serializeDataNode(upper);
+    lower.serialization = await this.serializeDataPage(lower);
+    upper.serialization = await this.serializeDataPage(upper);
 
-    const fillRatio = this._maxNodeSize / this._fillFactor;
+    const fillRatio = this._maxPageSize / this._fillFactor;
     let onlyOneChild = false;
 
     if (lower.serialization.length < fillRatio) {
       // need to flow elements high to low
       while (lower.serialization.length < fillRatio && upper.serialization.length >= fillRatio) {
-        if (node.isLeaf) {
+        if (page.isLeaf) {
           const next = upper.entries.shift();
           if (next === undefined) {
             throw new Error('Upper sibling must have elements in underflow high to low');
@@ -326,44 +329,44 @@ export class BPlusTree<K, V> {
           lower.entries.push(next);
           const parentEntry = upper.entries[0];
           if (parentEntry === undefined) {
-            lower.serialization = await this.serializeDataNode(lower);
-            upper.serialization = await this.serializeDataNode(upper);
+            lower.serialization = await this.serializeDataPage(lower);
+            upper.serialization = await this.serializeDataPage(upper);
             break;
           }
-          parentElement.node.pointers[parentElement.index].key = parentEntry.key;
+          parentElement.page.pointers[parentElement.index].key = parentEntry.key;
         } else {
           const next = upper.pointers.shift();
           if (next === undefined) {
             throw new Error('Upper sibling must have elements in underflow high to low');
           }
-          lower.pointers[lower.pointers.length - 1].key = parentElement.node.pointers[parentElement.index].key;
-          parentElement.node.pointers[parentElement.index].key = next.key;
+          lower.pointers[lower.pointers.length - 1].key = parentElement.page.pointers[parentElement.index].key;
+          parentElement.page.pointers[parentElement.index].key = next.key;
           next.key = null;
           lower.pointers.push(next);
           onlyOneChild = upper.pointers.length <= 1;
         }
 
-        lower.serialization = await this.serializeDataNode(lower);
-        upper.serialization = await this.serializeDataNode(upper);
+        lower.serialization = await this.serializeDataPage(lower);
+        upper.serialization = await this.serializeDataPage(upper);
       }
 
       if (upper.serialization.length < fillRatio || onlyOneChild) {
-        this.merge(node, lower, upper, path);
+        this.merge(page, lower, upper, path);
       }
     } else if (upper.serialization.length < fillRatio) {
       // need to flow elements low to high
       while (upper.serialization.length < fillRatio && lower.serialization.length >= fillRatio) {
-        if (node.isLeaf) {
+        if (page.isLeaf) {
           const next = lower.entries.pop();
           if (next === undefined) {
             throw new Error('Upper sibling must have elements in underflow high to low');
           }
           upper.entries.unshift(next);
           const parentKey = upper.entries[0].key;
-          if (node.id === upper.id) {
-            parentElement.node.pointers[parentElement.index - 1].key = parentKey;
+          if (page.id === upper.id) {
+            parentElement.page.pointers[parentElement.index - 1].key = parentKey;
           } else {
-            parentElement.node.pointers[parentElement.index].key = parentKey;
+            parentElement.page.pointers[parentElement.index].key = parentKey;
           }
         } else {
           const next = lower.pointers.pop();
@@ -372,13 +375,13 @@ export class BPlusTree<K, V> {
           }
 
           let parentIndex: number;
-          if (node.id === upper.id) {
+          if (page.id === upper.id) {
             parentIndex = parentElement.index - 1;
           } else {
             parentIndex = parentElement.index;
           }
-          next.key = parentElement.node.pointers[parentIndex].key;
-          parentElement.node.pointers[parentIndex].key = lower.pointers[lower.pointers.length - 1].key;
+          next.key = parentElement.page.pointers[parentIndex].key;
+          parentElement.page.pointers[parentIndex].key = lower.pointers[lower.pointers.length - 1].key;
           if (lower.pointers.length > 1) {
             lower.pointers[lower.pointers.length - 1].key = null;
           } else {
@@ -387,12 +390,12 @@ export class BPlusTree<K, V> {
           upper.pointers.unshift(next);
         }
 
-        lower.serialization = await this.serializeDataNode(lower);
-        upper.serialization = await this.serializeDataNode(upper);
+        lower.serialization = await this.serializeDataPage(lower);
+        upper.serialization = await this.serializeDataPage(upper);
       }
 
       if (lower.serialization.length < fillRatio || onlyOneChild) {
-        this.merge(node, lower, upper, path);
+        this.merge(page, lower, upper, path);
       }
     } else {
       throw new Error('Siblings should not be of equal length');
@@ -404,109 +407,109 @@ export class BPlusTree<K, V> {
     if (lower.entries.length === 0 && lower.pointers.length === 0) {
       await this._storage.free(lower.id);
     } else {
-      await this.storeDataNode(lower);
+      await this.storeDataPage(lower);
     }
 
     if (upper.entries.length === 0 && upper.pointers.length === 0) {
       await this._storage.free(upper.id);
     } else {
-      await this.storeDataNode(upper);
+      await this.storeDataPage(upper);
     }
-    await this.storeDataNode(parentElement.node, parentPath);
+    await this.storeDataPage(parentElement.page, parentPath);
   }
 
-  private merge(node: DataNode<K, V>, lower: DataNode<K, V>, upper: DataNode<K, V>, path: PathElement<K, V>[]) {
+  private merge(page: DataPage<K, V>, lower: DataPage<K, V>, upper: DataPage<K, V>, path: PathElement<K, V>[]) {
     const parentElement = path[path.length - 1];
     let parentIndex: number;
 
-    if (node.id === upper.id) {
+    if (page.id === upper.id) {
       parentIndex = parentElement.index - 1;
     } else {
       parentIndex = parentElement.index;
     }
 
-    if (node.isLeaf) {
+    if (page.isLeaf) {
       upper.entries.unshift(...lower.entries);
       lower.entries = [];
     } else {
-      lower.pointers[lower.pointers.length - 1].key = parentElement.node.pointers[parentIndex].key;
+      lower.pointers[lower.pointers.length - 1].key = parentElement.page.pointers[parentIndex].key;
       upper.pointers.unshift(...lower.pointers);
       lower.pointers = [];
     }
 
-    parentElement.node.pointers.splice(parentIndex, 1);
+    parentElement.page.pointers.splice(parentIndex, 1);
   }
 
-  private async loadNode(id: number): Promise<Node> {
+  private async loadPage(id: number): Promise<Page> {
     const result = await this._storage.get(id);
     if (result === undefined) {
-      throw new Error('Node not in storage');
+      throw new Error('Page not in storage');
     }
 
-    return await this.deserializeNode(result);
+    return await this.deserializePage(result);
   }
 
-  private async loadDataNode(id: number): Promise<DataNode<K, V>> {
+  private async loadDataPage(id: number): Promise<DataPage<K, V>> {
     const result = await this._storage.get(id);
     if (result === undefined) {
-      throw new Error('Node not in storage');
+      throw new Error('Page not in storage');
     }
 
-    const node = await this.deserializeNode(result);
+    const page = await this.deserializePage(result);
 
-    if (node.type === NodeType.Data) {
-      return node as DataNode<K, V>;
+    if (page.type === PageType.Data) {
+      return page as DataPage<K, V>;
     }
 
-    throw new Error('Node ID not associated with metanode');
+    throw new Error('Page ID not associated with metapage');
   }
 
-  private async loadMetadata(): Promise<MetaNode | undefined> {
+  private async loadMetadata(): Promise<MetaPage | undefined> {
     const result = await this._storage.getMetadata();
     if (result === undefined) {
       return result;
     }
-    this._metadata = cbor.decode(result) as MetaNode;
+    this._metadata = cbor.decode(result) as MetaPage;
     return this._metadata;
   }
 
-  private async serializeMetaNode(node: MetaNode): Promise<Buffer> {
-    const m = node as MetaNode;
+  private async serializeMetaPage(page: MetaPage): Promise<Buffer> {
+    const m = page as MetaPage;
     const data = m.rootId;
 
-    return cbor.encode(node.id, node.type, data);
+    return cbor.encode(page.id, page.type, data);
   }
 
-  private async serializeDataNode(node: DataNode<K, V>): Promise<Buffer> {
+  private async serializeDataPage(page: DataPage<K, V>): Promise<Buffer> {
     let data: any[];
-    const d = node as DataNode<K, V>;
+    const d = page as DataPage<K, V>;
     if (d.isLeaf) {
       data = d.entries.map((x) => {
         return [x.key, x.value];
       });
     } else {
       data = d.pointers.map((x) => {
-        return [x.key, x.nodeId];
+        return [x.key, x.pageId];
       });
     }
     data.unshift(d.isLeaf);
 
-    return cbor.encode(node.id, node.type, data);
+    return cbor.encode(page.id, page.type, data);
   }
 
-  private async deserializeNode(cborData: Buffer): Promise<Node> {
+  private async deserializePage(cborData: Buffer): Promise<Page> {
     const decodeArray = await cbor.decodeAll(cborData);
     const refId = decodeArray[0] as number;
     const refType = decodeArray[1] as number;
     const data = decodeArray[2] as any;
 
-    if (refType === NodeType.Data) {
-      let ref: DataNode<K, V>;
+    if (refType === PageType.Data) {
+      let ref: DataPage<K, V>;
       const isLeaf = data.shift();
       if (isLeaf) {
         ref = {
           id: refId,
-          type: NodeType.Data,
+          type: PageType.Data,
           isLeaf,
           pointers: [],
           entries: data.map((x: any[]) => {
@@ -518,44 +521,44 @@ export class BPlusTree<K, V> {
       } else {
         ref = {
           id: refId,
-          type: NodeType.Data,
+          type: PageType.Data,
           isLeaf,
           pointers: data.map((x: any[]) => {
-            return { key: x[0] as K, nodeId: x[1] as number };
+            return { key: x[0] as K, pageId: x[1] as number };
           }),
           entries: [],
         };
       }
       return ref;
-    } else if (refType === NodeType.Meta) {
-      let ref: MetaNode;
+    } else if (refType === PageType.Meta) {
+      let ref: MetaPage;
       ref = {
         id: refId,
-        type: NodeType.Meta,
+        type: PageType.Meta,
         rootId: data,
       };
       return ref;
     } else {
-      throw new Error('Unknown node type');
+      throw new Error('Unknown page type');
     }
   }
 
   private async findLeaf(
     key: K,
     path: PathElement<K, V>[],
-    node: DataNode<K, V>,
-  ): Promise<{ path: PathElement<K, V>[]; leaf: DataNode<K, V> }> {
-    if (node.isLeaf) {
-      return { path, leaf: node };
+    page: DataPage<K, V>,
+  ): Promise<{ path: PathElement<K, V>[]; leaf: DataPage<K, V> }> {
+    if (page.isLeaf) {
+      return { path, leaf: page };
     } else {
-      const { index, found } = this.getChildIndex(key, node);
+      const { index, found } = this.getChildIndex(key, page);
 
-      const childId = node.pointers[index + (found ? 1 : 0)];
-      const child = await this.loadDataNode(childId.nodeId);
+      const childId = page.pointers[index + (found ? 1 : 0)];
+      const child = await this.loadDataPage(childId.pageId);
       return await this.findLeaf(
         key,
         path.concat({
-          node,
+          page,
           index: index + (found ? 1 : 0),
           found,
         }),
@@ -564,23 +567,23 @@ export class BPlusTree<K, V> {
     }
   }
 
-  private getChildIndex(key: K, node: DataNode<K, V>): { index: number; found: boolean } {
+  private getChildIndex(key: K, page: DataPage<K, V>): { index: number; found: boolean } {
     let comparison: number;
     let index: number;
-    if (node.isLeaf) {
-      if (node.entries.length === 0) {
+    if (page.isLeaf) {
+      if (page.entries.length === 0) {
         return { index: 0, found: false };
       }
 
-      index = this.getChildIndexBinarySearch(key, node, 0, node.entries.length - 1);
-      comparison = this.compareKey(key, node.entries[index].key);
+      index = this.getChildIndexBinarySearch(key, page, 0, page.entries.length - 1);
+      comparison = this.compareKey(key, page.entries[index].key);
     } else {
-      if (node.pointers.length === 0) {
+      if (page.pointers.length === 0) {
         return { index: 0, found: false };
       }
 
-      index = this.getChildIndexBinarySearch(key, node, 0, node.pointers.length - 2);
-      const otherKey = node.pointers[index].key;
+      index = this.getChildIndexBinarySearch(key, page, 0, page.pointers.length - 2);
+      const otherKey = page.pointers[index].key;
       comparison = this.compareKey(key, otherKey);
     }
 
@@ -593,91 +596,91 @@ export class BPlusTree<K, V> {
     }
   }
 
-  private getChildIndexBinarySearch(key: K, node: DataNode<K, V>, start: number, end: number): number {
+  private getChildIndexBinarySearch(key: K, page: DataPage<K, V>, start: number, end: number): number {
     if (start === end) {
       return start;
     }
 
     const mid = Math.floor((start + end) / 2);
     let otherKey;
-    if (node.isLeaf) {
-      otherKey = node.entries[mid].key;
+    if (page.isLeaf) {
+      otherKey = page.entries[mid].key;
     } else {
-      otherKey = node.pointers[mid].key;
+      otherKey = page.pointers[mid].key;
     }
     const comparison = this.compareKey(key, otherKey);
 
     if (comparison === 0) {
       return mid;
     } else if (comparison < 0) {
-      return this.getChildIndexBinarySearch(key, node, start, Math.max(start, mid - 1));
+      return this.getChildIndexBinarySearch(key, page, start, Math.max(start, mid - 1));
     } else {
-      return this.getChildIndexBinarySearch(key, node, Math.min(end, mid + 1), end);
+      return this.getChildIndexBinarySearch(key, page, Math.min(end, mid + 1), end);
     }
   }
 
-  private async split(node: DataNode<K, V>, path: PathElement<K, V>[]) {
+  private async split(page: DataPage<K, V>, path: PathElement<K, V>[]) {
     let midKey: K | null;
     let midIndex: number;
-    if (node.isLeaf) {
-      midIndex = Math.floor((node.entries.length - (node.isLeaf ? 0 : 1)) / 2);
-      midKey = node.entries[midIndex].key;
+    if (page.isLeaf) {
+      midIndex = Math.floor((page.entries.length - (page.isLeaf ? 0 : 1)) / 2);
+      midKey = page.entries[midIndex].key;
     } else {
-      midIndex = Math.floor((node.pointers.length - (node.isLeaf ? 0 : 1)) / 2);
-      midKey = node.pointers[midIndex].key;
+      midIndex = Math.floor((page.pointers.length - (page.isLeaf ? 0 : 1)) / 2);
+      midKey = page.pointers[midIndex].key;
     }
 
     if (midKey == null) {
       throw new Error('Key is null');
     }
 
-    const newNode: DataNode<K, V> = {
+    const newPage: DataPage<K, V> = {
       id: this._idGenerator(),
-      type: NodeType.Data,
-      isLeaf: node.isLeaf,
-      pointers: node.pointers.slice(midIndex),
-      entries: node.entries.slice(midIndex),
+      type: PageType.Data,
+      isLeaf: page.isLeaf,
+      pointers: page.pointers.slice(midIndex),
+      entries: page.entries.slice(midIndex),
     };
 
-    node.pointers = node.pointers.slice(0, midIndex);
-    node.entries = node.entries.slice(0, midIndex);
+    page.pointers = page.pointers.slice(0, midIndex);
+    page.entries = page.entries.slice(0, midIndex);
 
-    if (!node.isLeaf) {
-      const newNodeChildId = newNode.pointers.shift();
-      if (newNodeChildId === undefined) {
-        throw new Error('Trying to split empty internal node');
+    if (!page.isLeaf) {
+      const newPageChildId = newPage.pointers.shift();
+      if (newPageChildId === undefined) {
+        throw new Error('Trying to split empty internal page');
       }
-      const newNodeChild = await this.loadNode(newNodeChildId.nodeId);
-      node.pointers.push({ key: null, nodeId: newNodeChild.id });
+      const newPageChild = await this.loadPage(newPageChildId.pageId);
+      page.pointers.push({ key: null, pageId: newPageChild.id });
     }
 
-    await this.storeDataNode(newNode, path);
-    await this.storeDataNode(node, path);
+    await this.storeDataPage(newPage, path);
+    await this.storeDataPage(page, path);
 
     if (path.length > 0) {
-      const parent = path[path.length - 1].node;
+      const parent = path[path.length - 1].page;
       const { index } = this.getChildIndex(midKey, parent);
-      parent.pointers.splice(index, 0, { key: midKey, nodeId: node.id });
-      parent.pointers[index + 1].nodeId = newNode.id;
+      parent.pointers.splice(index, 0, { key: midKey, pageId: page.id });
+      parent.pointers[index + 1].pageId = newPage.id;
 
       const newPath = [...path].slice(0, path.length - 1);
-      await this.storeDataNode(parent, newPath);
+      await this.storeDataPage(parent, newPath);
     } else {
       this._root = {
         id: this._idGenerator(),
-        type: NodeType.Data,
+        type: PageType.Data,
         isLeaf: false,
         pointers: [
-          { key: midKey, nodeId: node.id },
-          { key: null, nodeId: newNode.id },
+          { key: midKey, pageId: page.id },
+          { key: null, pageId: newPage.id },
         ],
         entries: [],
       };
 
-      await this.storeDataNode(this._root);
+      await this.storeDataPage(this._root);
       this._metadata = {
         id: 0,
-        type: NodeType.Meta,
+        type: PageType.Meta,
         rootId: this._root.id,
       };
       await this.storeMetadata();
