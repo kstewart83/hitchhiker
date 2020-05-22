@@ -129,10 +129,10 @@ export class BPlusTree<K, V> {
 
       if (page.refType === PageType.Data) {
         const dataPage = DataPage.deserializeDataPage<K, V>(page.refId, page.data);
-        str += await this.DataPageToDOT(dataPage, next.value.key);
+        str += await dataPage.DataPageToDOT(next.value.key);
       } else if (page.refType === PageType.Meta) {
         const metaPage = MetaPage.deserializeMetaPage(page.refId, page.data);
-        str += await this.metaPageToDOT(metaPage, next.value.key);
+        str += await metaPage.metaPageToDOT(next.value.key, this._storage);
       } else {
         throw new Error('Unknown Page Type');
       }
@@ -188,61 +188,6 @@ export class BPlusTree<K, V> {
     const hash = new SHA3(256);
     hash.update(page.serialization);
     page.hash = hash.digest().slice(0, 16);
-  }
-
-  private async metaPageToDOT(page: MetaPage, internalId: number): Promise<string> {
-    let str = `tree -> n${internalId}\n`;
-    if (this._storage instanceof MemoryStorage) {
-      const memStor = this._storage as MemoryStorage;
-      if (internalId === memStor.DataMetadataId) {
-        str += `n${internalId} [label="Data"]\n`;
-      } else if (internalId === memStor.IdMapMetadataId) {
-        str += `n${internalId} [label="ID Map"]\n`;
-      } else {
-        str += `n${internalId} [label="M${page.id}:I${internalId}"]\n`;
-      }
-    } else {
-      str += `n${internalId} [label="M${page.id}:I${internalId}"]\n`;
-    }
-    str += `n${internalId} -> n${page.rootId}\n`;
-    return str;
-  }
-
-  private async DataPageToDOT(page: DataPage<K, V>, internalId: number) {
-    let str = '';
-    let fieldStr = '';
-    let i = 0;
-    let fillColor = '';
-    if (page.id > 9900000) {
-      fillColor = `fillcolor="${page.isLeaf ? '#ddffff' : '#ffffdd'}"`;
-    } else {
-      fillColor = `fillcolor="${page.isLeaf ? '#88ffff' : '#ffff88'}"`;
-    }
-    if (page.isLeaf) {
-      fieldStr += `
-  <table border="0" cellborder="1" cellspacing="0">
-    <tr><td cellborder="1" bgcolor="#eeffff"><b>E${page.id}:I${internalId}</b></td></tr>
-    <hr/>
-    <tr><td border="0" >
-      <table cellspacing='0'>
-        <tr><td bgcolor="#88ffcc"><b>K</b></td><td bgcolor="#88ffcc"><b>V</b></td></tr>        `;
-      page.entries.forEach((d) => {
-        fieldStr += `        <tr><td>${d.key}</td><td>${d.value == null ? '*' : d.value}`;
-        fieldStr += `</td></tr>\n`;
-      });
-      fieldStr += `
-      </table>
-    </td></tr>
-  </table>`;
-      str += `n${page.id} [${fillColor}, style=filled, label=<${fieldStr}>];\n`;
-    } else {
-      page.pointers.forEach((cId) => {
-        str += `n${page.id}:c${i} -> n${cId.pageId}\n`;
-        fieldStr += `|<c${i++}>${cId.key == null ? '*' : cId.key}`;
-      });
-      str += `n${page.id} [${fillColor}, style=filled, label="E${page.id}:I${internalId}${fieldStr}"]\n`;
-    }
-    return str;
   }
 
   private async storeMetadata() {

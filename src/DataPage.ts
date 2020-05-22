@@ -56,6 +56,43 @@ export class DataPage<K, V> extends Page {
     return ref;
   }
 
+  async DataPageToDOT(internalId: number) {
+    let str = '';
+    let fieldStr = '';
+    let i = 0;
+    let fillColor = '';
+    if (this.id > 9900000) {
+      fillColor = `fillcolor="${this.isLeaf ? '#ddffff' : '#ffffdd'}"`;
+    } else {
+      fillColor = `fillcolor="${this.isLeaf ? '#88ffff' : '#ffff88'}"`;
+    }
+    if (this.isLeaf) {
+      fieldStr += `
+  <table border="0" cellborder="1" cellspacing="0">
+    <tr><td cellborder="1" bgcolor="#eeffff"><b>E${this.id}:I${internalId}</b></td></tr>
+    <hr/>
+    <tr><td border="0" >
+      <table cellspacing='0'>
+        <tr><td bgcolor="#88ffcc"><b>K</b></td><td bgcolor="#88ffcc"><b>V</b></td></tr>        `;
+      this.entries.forEach((d) => {
+        fieldStr += `        <tr><td>${d.key}</td><td>${d.value == null ? '*' : d.value}`;
+        fieldStr += `</td></tr>\n`;
+      });
+      fieldStr += `
+      </table>
+    </td></tr>
+  </table>`;
+      str += `n${this.id} [${fillColor}, style=filled, label=<${fieldStr}>];\n`;
+    } else {
+      this.pointers.forEach((cId) => {
+        str += `n${this.id}:c${i} -> n${cId.pageId}\n`;
+        fieldStr += `|<c${i++}>${cId.key == null ? '*' : cId.key}`;
+      });
+      str += `n${this.id} [${fillColor}, style=filled, label="E${this.id}:I${internalId}${fieldStr}"]\n`;
+    }
+    return str;
+  }
+
   private _isLeaf: boolean;
   pointers: Pointer<K>[];
   entries: Entry<K, V>[];
