@@ -125,12 +125,14 @@ export class BPlusTree<K, V> {
     let next = gen.next();
     while (!next.done) {
       const nextResult = next.value;
-      const page = await this.deserializePage(nextResult.buffer);
+      const page = await Page.deserializePage(nextResult.buffer);
 
-      if (page.type === PageType.Data) {
-        str += await this.DataPageToDOT(page as DataPage<K, V>, next.value.key);
-      } else if (page.type === PageType.Meta) {
-        str += await this.metaPageToDOT(page as MetaPage, next.value.key);
+      if (page.refType === PageType.Data) {
+        const dataPage = DataPage.deserializeDataPage<K, V>(page.refId, page.data);
+        str += await this.DataPageToDOT(dataPage, next.value.key);
+      } else if (page.refType === PageType.Meta) {
+        const metaPage = MetaPage.deserializeMetaPage(page.refId, page.data);
+        str += await this.metaPageToDOT(metaPage, next.value.key);
       } else {
         throw new Error('Unknown Page Type');
       }
@@ -164,13 +166,9 @@ export class BPlusTree<K, V> {
       this._metadata = metadata;
       this._root = await this.loadDataPage(metadata.rootId);
     } else {
-      this._root = { id: this._idGenerator(), type: PageType.Data, isLeaf: true, pointers: [], entries: [] };
+      this._root = new DataPage(this._idGenerator(), true, [], []);
       await this.storeDataPage(this._root);
-      this._metadata = {
-        id: 0,
-        type: PageType.Meta,
-        rootId: this._root.id,
-      };
+      this._metadata = new MetaPage(0, this._root.id);
       await this.storeMetadata();
     }
     this._setupComplete = true;
@@ -179,9 +177,9 @@ export class BPlusTree<K, V> {
   private async setHash(page: Page) {
     if (page.serialization === undefined) {
       if (page.type === PageType.Data) {
-        page.serialization = await this.serializeDataPage(page as DataPage<K, V>);
+        page.serialization = await (page as DataPage<K, V>).serializeDataPage();
       } else if (page.type === PageType.Meta) {
-        page.serialization = await this.serializeMetaPage(page as MetaPage);
+        page.serialization = await (page as MetaPage).serializeMetaPage();
       } else {
         throw new Error('Unknown page type');
       }
@@ -251,7 +249,7 @@ export class BPlusTree<K, V> {
     if (this._metadata === undefined) {
       throw new Error('Root is not defined');
     }
-    const pageBuf = await this.serializeMetaPage(this._metadata);
+    const pageBuf = await this._metadata.serializeMetaPage();
     await this._storage.putMetadata(pageBuf);
   }
 
@@ -260,7 +258,7 @@ export class BPlusTree<K, V> {
       throw new Error('Root is not defined');
     }
 
-    page.serialization = await this.serializeDataPage(page);
+    page.serialization = await page.serializeDataPage();
 
     // if adding a new item fills the page, split it
     if (page.serialization.length > this._maxPageSize) {
@@ -274,11 +272,7 @@ export class BPlusTree<K, V> {
       const oldRootId = this._root.id;
       const onlyChild = await this.loadDataPage(page.pointers[0].pageId);
       this._root = onlyChild;
-      this._metadata = {
-        id: 0,
-        type: PageType.Meta,
-        rootId: onlyChild.id,
-      };
+      this._metadata = new MetaPage(0, onlyChild.id);
       await this.storeMetadata();
       await this._storage.free(oldRootId);
     } else if (this._root.id !== page.id && page.serialization.length < this._maxPageSize / this._fillFactor) {
@@ -312,14 +306,15 @@ export class BPlusTree<K, V> {
       throw new Error('Underflow pages should have at least one sibling');
     }
 
-    lower.serialization = await this.serializeDataPage(lower);
-    upper.serialization = await this.serializeDataPage(upper);
+    lower.serialization = await lower.serializeDataPage();
+    upper.serialization = await upper.serializeDataPage();
 
     const fillRatio = this._maxPageSize / this._fillFactor;
     let onlyOneChild = false;
 
     if (lower.serialization.length < fillRatio) {
       // need to flow elements high to low
+
       while (lower.serialization.length < fillRatio && upper.serialization.length >= fillRatio) {
         if (page.isLeaf) {
           const next = upper.entries.shift();
@@ -329,8 +324,8 @@ export class BPlusTree<K, V> {
           lower.entries.push(next);
           const parentEntry = upper.entries[0];
           if (parentEntry === undefined) {
-            lower.serialization = await this.serializeDataPage(lower);
-            upper.serialization = await this.serializeDataPage(upper);
+            lower.serialization = await lower.serializeDataPage();
+            upper.serialization = await upper.serializeDataPage();
             break;
           }
           parentElement.page.pointers[parentElement.index].key = parentEntry.key;
@@ -346,8 +341,8 @@ export class BPlusTree<K, V> {
           onlyOneChild = upper.pointers.length <= 1;
         }
 
-        lower.serialization = await this.serializeDataPage(lower);
-        upper.serialization = await this.serializeDataPage(upper);
+        lower.serialization = await lower.serializeDataPage();
+        upper.serialization = await upper.serializeDataPage();
       }
 
       if (upper.serialization.length < fillRatio || onlyOneChild) {
@@ -390,8 +385,8 @@ export class BPlusTree<K, V> {
           upper.pointers.unshift(next);
         }
 
-        lower.serialization = await this.serializeDataPage(lower);
-        upper.serialization = await this.serializeDataPage(upper);
+        lower.serialization = await lower.serializeDataPage();
+        upper.serialization = await upper.serializeDataPage();
       }
 
       if (lower.serialization.length < fillRatio || onlyOneChild) {
@@ -446,7 +441,15 @@ export class BPlusTree<K, V> {
       throw new Error('Page not in storage');
     }
 
-    return await this.deserializePage(result);
+    const page = await Page.deserializePage(result);
+
+    if (page.refType === PageType.Data) {
+      return DataPage.deserializeDataPage(page.refId, page.data);
+    } else if (page.refType === PageType.Meta) {
+      return MetaPage.deserializeMetaPage(page.refId, page.data);
+    }
+
+    throw new Error('Unknown page type');
   }
 
   private async loadDataPage(id: number): Promise<DataPage<K, V>> {
@@ -455,10 +458,10 @@ export class BPlusTree<K, V> {
       throw new Error('Page not in storage');
     }
 
-    const page = await this.deserializePage(result);
+    const page = await Page.deserializePage(result);
 
-    if (page.type === PageType.Data) {
-      return page as DataPage<K, V>;
+    if (page.refType === PageType.Data) {
+      return DataPage.deserializeDataPage(page.refId, page.data);
     }
 
     throw new Error('Page ID not associated with metapage');
@@ -471,76 +474,6 @@ export class BPlusTree<K, V> {
     }
     this._metadata = cbor.decode(result) as MetaPage;
     return this._metadata;
-  }
-
-  private async serializeMetaPage(page: MetaPage): Promise<Buffer> {
-    const m = page as MetaPage;
-    const data = m.rootId;
-
-    return cbor.encode(page.id, page.type, data);
-  }
-
-  private async serializeDataPage(page: DataPage<K, V>): Promise<Buffer> {
-    let data: any[];
-    const d = page as DataPage<K, V>;
-    if (d.isLeaf) {
-      data = d.entries.map((x) => {
-        return [x.key, x.value];
-      });
-    } else {
-      data = d.pointers.map((x) => {
-        return [x.key, x.pageId];
-      });
-    }
-    data.unshift(d.isLeaf);
-
-    return cbor.encode(page.id, page.type, data);
-  }
-
-  private async deserializePage(cborData: Buffer): Promise<Page> {
-    const decodeArray = await cbor.decodeAll(cborData);
-    const refId = decodeArray[0] as number;
-    const refType = decodeArray[1] as number;
-    const data = decodeArray[2] as any;
-
-    if (refType === PageType.Data) {
-      let ref: DataPage<K, V>;
-      const isLeaf = data.shift();
-      if (isLeaf) {
-        ref = {
-          id: refId,
-          type: PageType.Data,
-          isLeaf,
-          pointers: [],
-          entries: data.map((x: any[]) => {
-            return { key: x[0] as K, value: x[1] as V };
-          }),
-        };
-
-        return ref;
-      } else {
-        ref = {
-          id: refId,
-          type: PageType.Data,
-          isLeaf,
-          pointers: data.map((x: any[]) => {
-            return { key: x[0] as K, pageId: x[1] as number };
-          }),
-          entries: [],
-        };
-      }
-      return ref;
-    } else if (refType === PageType.Meta) {
-      let ref: MetaPage;
-      ref = {
-        id: refId,
-        type: PageType.Meta,
-        rootId: data,
-      };
-      return ref;
-    } else {
-      throw new Error('Unknown page type');
-    }
   }
 
   private async findLeaf(
@@ -634,14 +567,12 @@ export class BPlusTree<K, V> {
       throw new Error('Key is null');
     }
 
-    const newPage: DataPage<K, V> = {
-      id: this._idGenerator(),
-      type: PageType.Data,
-      isLeaf: page.isLeaf,
-      pointers: page.pointers.slice(midIndex),
-      entries: page.entries.slice(midIndex),
-    };
-
+    const newPage: DataPage<K, V> = new DataPage(
+      this._idGenerator(),
+      page.isLeaf,
+      page.pointers.slice(midIndex),
+      page.entries.slice(midIndex),
+    );
     page.pointers = page.pointers.slice(0, midIndex);
     page.entries = page.entries.slice(0, midIndex);
 
@@ -666,23 +597,18 @@ export class BPlusTree<K, V> {
       const newPath = [...path].slice(0, path.length - 1);
       await this.storeDataPage(parent, newPath);
     } else {
-      this._root = {
-        id: this._idGenerator(),
-        type: PageType.Data,
-        isLeaf: false,
-        pointers: [
+      this._root = new DataPage(
+        this._idGenerator(),
+        false,
+        [
           { key: midKey, pageId: page.id },
           { key: null, pageId: newPage.id },
         ],
-        entries: [],
-      };
+        [],
+      );
 
       await this.storeDataPage(this._root);
-      this._metadata = {
-        id: 0,
-        type: PageType.Meta,
-        rootId: this._root.id,
-      };
+      this._metadata = new MetaPage(0, this._root.id);
       await this.storeMetadata();
     }
   }
