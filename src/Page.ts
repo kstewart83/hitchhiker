@@ -12,10 +12,6 @@ export class Page {
   hash?: Buffer;
   serialization?: Buffer;
 
-  static load(storage: IReferenceStorage): Page {
-    throw new Error('Not implemented');
-  }
-
   static async deserializePage(cborData: Buffer): Promise<{ refId: number; refType: PageType; data: any }> {
     const decodeArray = await cbor.decodeAll(cborData);
     const refId = decodeArray[0] as number;

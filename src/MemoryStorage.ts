@@ -44,7 +44,7 @@ export class MemoryStorage implements IReferenceStorage {
       },
     };
 
-    this._extIdMap = new BPlusTree<number, number>(internalBTreeMethods, undefined, () => {
+    this._extIdMap = new BPlusTree<number, number>(internalBTreeMethods, () => {
       return that._nextId++;
     });
   }

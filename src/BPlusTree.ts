@@ -13,7 +13,7 @@ export class BPlusTree<K, V> {
    * @param branching Branching factor for each page.
    * @param comparator Custom compartor for key values
    */
-  public constructor(storage?: IReferenceStorage, comparator?: (a: K, b: K) => number, idGenerator?: () => number) {
+  public constructor(storage?: IReferenceStorage, idGenerator?: () => number) {
     this._fillFactor = 4;
     this._root = undefined;
     this._metadata = undefined;
@@ -32,7 +32,6 @@ export class BPlusTree<K, V> {
     } else {
       this._idGenerator = idGenerator;
     }
-    this._comparator = comparator;
     (async () => {
       await this.setup();
     })();
@@ -53,7 +52,7 @@ export class BPlusTree<K, V> {
       throw new Error('Root is not defined');
     }
     const { leaf } = await this.findLeaf(key, [], this._root);
-    const { index, found } = this.getChildIndex(key, leaf);
+    const { index, found } = leaf.getChildIndex(key);
 
     if (found) {
       return leaf.entries[index].value;
@@ -77,7 +76,7 @@ export class BPlusTree<K, V> {
       throw new Error('Root is not defined');
     }
     const { path, leaf } = await this.findLeaf(key, [], this._root);
-    const { index, found } = this.getChildIndex(key, leaf);
+    const { index, found } = leaf.getChildIndex(key);
 
     // if key already exists, overwrite existing value
     if (found) {
@@ -104,7 +103,7 @@ export class BPlusTree<K, V> {
       throw new Error('Root is not defined');
     }
     const { path, leaf } = await this.findLeaf(key, [], this._root);
-    const { index, found } = this.getChildIndex(key, leaf);
+    const { index, found } = leaf.getChildIndex(key);
 
     // if key exists, remove entry
     if (found) {
@@ -147,7 +146,6 @@ export class BPlusTree<K, V> {
 
   private _setupComplete: boolean;
   private _root: DataPage<K, V> | undefined;
-  private _comparator?: (a: K, b: K) => number;
   private _storage: IReferenceStorage;
   private _metadata: MetaPage | undefined;
   private _idGenerator: () => number;
@@ -429,7 +427,7 @@ export class BPlusTree<K, V> {
     if (page.isLeaf) {
       return { path, leaf: page };
     } else {
-      const { index, found } = this.getChildIndex(key, page);
+      const { index, found } = page.getChildIndex(key);
 
       const childId = page.pointers[index + (found ? 1 : 0)];
       const child = await this.loadDataPage(childId.pageId);
@@ -442,58 +440,6 @@ export class BPlusTree<K, V> {
         }),
         child,
       );
-    }
-  }
-
-  private getChildIndex(key: K, page: DataPage<K, V>): { index: number; found: boolean } {
-    let comparison: number;
-    let index: number;
-    if (page.isLeaf) {
-      if (page.entries.length === 0) {
-        return { index: 0, found: false };
-      }
-
-      index = this.getChildIndexBinarySearch(key, page, 0, page.entries.length - 1);
-      comparison = this.compareKey(key, page.entries[index].key);
-    } else {
-      if (page.pointers.length === 0) {
-        return { index: 0, found: false };
-      }
-
-      index = this.getChildIndexBinarySearch(key, page, 0, page.pointers.length - 2);
-      const otherKey = page.pointers[index].key;
-      comparison = this.compareKey(key, otherKey);
-    }
-
-    if (comparison === 0) {
-      return { index, found: true };
-    } else if (comparison < 0) {
-      return { index, found: false };
-    } else {
-      return { index: index + 1, found: false };
-    }
-  }
-
-  private getChildIndexBinarySearch(key: K, page: DataPage<K, V>, start: number, end: number): number {
-    if (start === end) {
-      return start;
-    }
-
-    const mid = Math.floor((start + end) / 2);
-    let otherKey;
-    if (page.isLeaf) {
-      otherKey = page.entries[mid].key;
-    } else {
-      otherKey = page.pointers[mid].key;
-    }
-    const comparison = this.compareKey(key, otherKey);
-
-    if (comparison === 0) {
-      return mid;
-    } else if (comparison < 0) {
-      return this.getChildIndexBinarySearch(key, page, start, Math.max(start, mid - 1));
-    } else {
-      return this.getChildIndexBinarySearch(key, page, Math.min(end, mid + 1), end);
     }
   }
 
@@ -535,7 +481,7 @@ export class BPlusTree<K, V> {
 
     if (path.length > 0) {
       const parent = path[path.length - 1].page;
-      const { index } = this.getChildIndex(midKey, parent);
+      const { index } = parent.getChildIndex(midKey);
       parent.pointers.splice(index, 0, { key: midKey, pageId: page.id });
       parent.pointers[index + 1].pageId = newPage.id;
 
@@ -555,28 +501,6 @@ export class BPlusTree<K, V> {
       await this.storeDataPage(this._root);
       this._metadata = new MetaPage(0, this._root.id);
       await this.storeMetadata();
-    }
-  }
-
-  private compareKey(a?: K | null, b?: K | null): number {
-    if (a == null || b == null) {
-      throw new Error('Key is null');
-    }
-
-    if (a === undefined || b === undefined) {
-      throw new Error('Key is undefined');
-    }
-
-    if (this._comparator) {
-      return this._comparator(a, b);
-    } else {
-      if (a < b) {
-        return -1;
-      } else if (a > b) {
-        return 1;
-      } else {
-        return 0;
-      }
     }
   }
 }
