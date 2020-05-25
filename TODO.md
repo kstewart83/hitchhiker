@@ -17,6 +17,7 @@ This document tracks the goals and tasks for each major and minor release of thi
 ### Tasks
 
 `.M--I--T--D.` <br/>
+`[-][x][x][-] [0.0.4]` Enable storage driver to re-allocated freed pages <br/>
 `[-][x][x][-] [0.0.4]` Make storage interface methods async <br/>
 `[-][x][x][-] [0.0.4]` Create DynamoDB implementation of storage abstraction <br/>
 

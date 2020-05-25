@@ -1,6 +1,7 @@
 import Page, { PageType } from './Page';
 import { Pointer, Entry } from './Interfaces';
 import * as cbor from 'cbor';
+import { SHA3 } from 'sha3';
 
 export class DataPage<K, V> extends Page {
   get isLeaf(): boolean {
@@ -12,6 +13,32 @@ export class DataPage<K, V> extends Page {
     this._isLeaf = isLeaf;
     this.pointers = pointers;
     this.entries = entries;
+  }
+
+  upsertEntry(key: K, value?: V): { index: number; found: boolean } {
+    const { index, found } = this.getChildIndex(key);
+
+    // if key already exists, overwrite existing value
+    if (found) {
+      this.entries[index].value = value;
+    } else {
+      // otherwise, insert key/value pair based on the returned index
+      this.entries.splice(index, 0, { key, value });
+    }
+
+    return { index, found };
+  }
+
+  deleteEntry(key: K): { found: boolean; value?: V } {
+    const { index, found } = this.getChildIndex(key);
+
+    // if key exists, remove entry
+    if (found) {
+      const entry = this.entries.splice(index, 1)[0];
+      return { found, value: entry.value };
+    } else {
+      return { found, value: undefined };
+    }
   }
 
   getChildIndex(key: K): { index: number; found: boolean } {
@@ -124,6 +151,16 @@ export class DataPage<K, V> extends Page {
       );
     }
     return ref;
+  }
+
+  async setHash() {
+    if (this.serialization === undefined) {
+      this.serialization = await this.serializeDataPage();
+    }
+
+    const hash = new SHA3(256);
+    hash.update(this.serialization);
+    this.hash = hash.digest().slice(0, 16);
   }
 
   async DataPageToDOT(internalId: number) {

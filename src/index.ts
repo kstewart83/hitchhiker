@@ -9,22 +9,28 @@ export { BPlusTree };
 // tslint:disable: no-console
 
 async function main() {
-  const storage = new DynamoStorage('TestTable');
-  // const storage = new MemoryStorage();
+  // const storage = new DynamoStorage('TestTable');
+  const storage = new MemoryStorage();
   const test = new BPlusTree<number, number>(storage);
   const entries: any = {};
-  const total = 500;
+  const total = 150;
   const timings: bigint[] = [];
   const rng = new PcgRandom(total);
   timings.push(process.hrtime.bigint());
   for (let i = 0; i < total; i++) {
-    entries[i] = i;
-    await test.add(i, i);
+    const k = rng.integer(total * 10);
+    const v = rng.integer(total * 10);
+    entries[k] = v;
+    await test.add(k, v);
     if (i % 10 === 0) {
       console.log('a = ', i);
     }
     timings.push(process.hrtime.bigint());
   }
+
+  let str = await test.toDOT();
+
+  /*
 
   for (let i = 0; i < total; i++) {
     const keys = Object.keys(entries);
@@ -43,6 +49,9 @@ async function main() {
     }
   }
 
+  str = await test.toDOT();
+  */
+
   for (let i = total - 1; i >= 0; i--) {
     const keys = Object.keys(entries);
     const nextIndex = rng.integer(keys.length);
@@ -59,6 +68,21 @@ async function main() {
     delete entries[nextKey];
   }
 
+  str = await test.toDOT();
+
+  for (let i = 0; i < total; i++) {
+    str = await test.toDOT();
+    const k = rng.integer(total * 10);
+    const v = rng.integer(total * 10);
+    entries[k] = v;
+    await test.add(k, v);
+    if (i % 10 === 0) {
+      console.log('a = ', i);
+    }
+    timings.push(process.hrtime.bigint());
+  }
+
+  str = await test.toDOT();
   console.log((timings[timings.length - 1] - timings[0]) / BigInt(1));
   console.log((timings[timings.length - 1] - timings[0]) / BigInt(1000000));
 }

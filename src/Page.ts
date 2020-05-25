@@ -4,6 +4,7 @@ import * as cbor from 'cbor';
 export enum PageType {
   Data = 1,
   Meta = 2,
+  Free = 3,
 }
 
 export class Page {

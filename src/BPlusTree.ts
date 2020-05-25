@@ -3,8 +3,7 @@ import { Page, PageType } from './Page';
 import { DataPage } from './DataPage';
 import { MetaPage } from './MetaPage';
 import MemoryStorage from './MemoryStorage';
-import * as cbor from 'cbor';
-import { SHA3 } from 'sha3';
+import { FreePage } from './FreePage';
 
 export class BPlusTree<K, V> {
   /*** PUBLIC ***/
@@ -13,11 +12,12 @@ export class BPlusTree<K, V> {
    * @param branching Branching factor for each page.
    * @param comparator Custom compartor for key values
    */
-  public constructor(storage?: IReferenceStorage, idGenerator?: () => number) {
+  public constructor(storage?: IReferenceStorage, idGenerator?: () => Promise<number>) {
     this._fillFactor = 4;
     this._root = undefined;
     this._metadata = undefined;
     this._setupComplete = false;
+    this._operationPending = false;
     if (storage) {
       this._storage = storage;
     } else {
@@ -26,7 +26,7 @@ export class BPlusTree<K, V> {
     this._maxPageSize = this._storage.maxPageSize();
     if (idGenerator === undefined) {
       let baseId = 900000;
-      this._idGenerator = () => {
+      this._idGenerator = async () => {
         return baseId++;
       };
     } else {
@@ -62,6 +62,40 @@ export class BPlusTree<K, V> {
   }
 
   /**
+   * This function searches the tree for the key after the search key. If the search key
+   * is found, then it is returned. Otherwise, it returns the key that is next in sort
+   * order. If no keys exist above the provided search key, then it returns undefined.
+   *
+   * @param key Key to search for in tree
+   * @returns Key after search key if it exists (can be null) or undefined
+   */
+  public async findNext(key: K): Promise<K | undefined> {
+    if (!this._setupComplete) {
+      await this.blockOnSetup();
+    }
+    if (this._root === undefined) {
+      throw new Error('Root is not defined');
+    }
+    const { path, leaf } = await this.findLeaf(key, [], this._root);
+    const { index, found } = leaf.getChildIndex(key);
+
+    if (found) {
+      return key;
+    } else {
+      if (leaf.entries.length > index) {
+        return leaf.entries[index].key;
+      } else {
+        if (leaf.id === this._root.id) {
+          return undefined;
+        } else {
+          // get upper sibling and return first child
+          throw new Error('Not implemented');
+        }
+      }
+    }
+  }
+
+  /**
    * This function adds the key/value pair to the tree, overwriting values for keys
    * that already exist
    *
@@ -75,19 +109,14 @@ export class BPlusTree<K, V> {
     if (this._root === undefined) {
       throw new Error('Root is not defined');
     }
-    const { path, leaf } = await this.findLeaf(key, [], this._root);
-    const { index, found } = leaf.getChildIndex(key);
-
-    // if key already exists, overwrite existing value
-    if (found) {
-      leaf.entries[index].value = value;
-      await this.storeDataPage(leaf, path);
-      return;
+    if (this._operationPending) {
+      throw new Error('Not implemented');
     }
-
-    // otherwise, insert key/value pair based on the returned index
-    leaf.entries.splice(index, 0, { key, value });
+    this._operationPending = true;
+    const { path, leaf } = await this.findLeaf(key, [], this._root);
+    leaf.upsertEntry(key, value);
     await this.storeDataPage(leaf, path);
+    this._operationPending = false;
   }
 
   /**
@@ -102,36 +131,55 @@ export class BPlusTree<K, V> {
     if (this._root === undefined) {
       throw new Error('Root is not defined');
     }
-    const { path, leaf } = await this.findLeaf(key, [], this._root);
-    const { index, found } = leaf.getChildIndex(key);
-
-    // if key exists, remove entry
-    if (found) {
-      const entry = leaf.entries.splice(index, 1)[0];
-      await this.storeDataPage(leaf, path);
-      return entry.value;
-    } else {
-      return undefined;
+    if (this._operationPending) {
+      throw new Error('Not implemented');
     }
+    this._operationPending = true;
+    const { path, leaf } = await this.findLeaf(key, [], this._root);
+    const { found, value } = leaf.deleteEntry(key);
+    if (found) {
+      await this.storeDataPage(leaf, path);
+    }
+    this._operationPending = false;
+    return value;
+  }
+
+  /**
+   * This function continually awaits for setup to be complete.
+   */
+  public async blockOnSetup() {
+    while (!this._setupComplete) {
+      await new Promise((r) => setTimeout(r, 1));
+    }
+  }
+
+  /**
+   * Return true when a mutating operating is already occurring.
+   */
+  public isOperationPending() {
+    return this._operationPending;
   }
 
   /**
    * Convert tree to DOT representation
    */
-  public async toDOT(): Promise<string> {
+  public static async toDOT(storage: IReferenceStorage): Promise<string> {
     let str = '';
-    const gen = this._storage.generator();
+    const gen = storage.generator();
     let next = gen.next();
     while (!next.done) {
       const nextResult = next.value;
       const page = await Page.deserializePage(nextResult.buffer);
 
       if (page.refType === PageType.Data) {
-        const dataPage = DataPage.deserializeDataPage<K, V>(page.refId, page.data);
+        const dataPage = DataPage.deserializeDataPage(page.refId, page.data);
         str += await dataPage.DataPageToDOT(next.value.key);
       } else if (page.refType === PageType.Meta) {
         const metaPage = MetaPage.deserializeMetaPage(page.refId, page.data);
-        str += await metaPage.metaPageToDOT(next.value.key, this._storage);
+        str += await metaPage.metaPageToDOT(next.value.key, storage);
+      } else if (page.refType === PageType.Free) {
+        const freePage = FreePage.deserializeFreePage(page.refId, page.data);
+        str += await freePage.freePageToDOT(next.value.key, storage);
       } else {
         throw new Error('Unknown Page Type');
       }
@@ -142,21 +190,23 @@ export class BPlusTree<K, V> {
     return str;
   }
 
+  /**
+   * Convert tree to DOT representation
+   */
+  public async toDOT(): Promise<string> {
+    return await BPlusTree.toDOT(this._storage);
+  }
+
   /*** PRIVATE ***/
 
   private _setupComplete: boolean;
   private _root: DataPage<K, V> | undefined;
   private _storage: IReferenceStorage;
   private _metadata: MetaPage | undefined;
-  private _idGenerator: () => number;
+  private _idGenerator: () => Promise<number>;
   private readonly _fillFactor: number;
   private readonly _maxPageSize: number;
-
-  private async blockOnSetup() {
-    while (!this._setupComplete) {
-      await new Promise((r) => setTimeout(r, 1));
-    }
-  }
+  private _operationPending: boolean;
 
   private async setup() {
     const metadata = await this.loadMetadata();
@@ -164,28 +214,12 @@ export class BPlusTree<K, V> {
       this._metadata = metadata;
       this._root = await this.loadDataPage(metadata.rootId);
     } else {
-      this._root = new DataPage(this._idGenerator(), true, [], []);
+      this._root = new DataPage(await this._idGenerator(), true, [], []);
       await this.storeDataPage(this._root);
       this._metadata = new MetaPage(0, this._root.id);
       await this.storeMetadata();
     }
     this._setupComplete = true;
-  }
-
-  private async setHash(page: Page) {
-    if (page.serialization === undefined) {
-      if (page.type === PageType.Data) {
-        page.serialization = await (page as DataPage<K, V>).serializeDataPage();
-      } else if (page.type === PageType.Meta) {
-        page.serialization = await (page as MetaPage).serializeMetaPage();
-      } else {
-        throw new Error('Unknown page type');
-      }
-    }
-
-    const hash = new SHA3(256);
-    hash.update(page.serialization);
-    page.hash = hash.digest().slice(0, 16);
   }
 
   private async storeMetadata() {
@@ -225,7 +259,7 @@ export class BPlusTree<K, V> {
       }
       await this.underflow(page, path);
     } else {
-      await this.setHash(page);
+      await page.setHash();
       await this._storage.put(page.id, page.serialization);
       page.serialization = undefined;
     }
@@ -378,23 +412,6 @@ export class BPlusTree<K, V> {
     parentElement.page.pointers.splice(parentIndex, 1);
   }
 
-  private async loadPage(id: number): Promise<Page> {
-    const result = await this._storage.get(id);
-    if (result === undefined) {
-      throw new Error('Page not in storage');
-    }
-
-    const page = await Page.deserializePage(result);
-
-    if (page.refType === PageType.Data) {
-      return DataPage.deserializeDataPage(page.refId, page.data);
-    } else if (page.refType === PageType.Meta) {
-      return MetaPage.deserializeMetaPage(page.refId, page.data);
-    }
-
-    throw new Error('Unknown page type');
-  }
-
   private async loadDataPage(id: number): Promise<DataPage<K, V>> {
     const result = await this._storage.get(id);
     if (result === undefined) {
@@ -407,7 +424,7 @@ export class BPlusTree<K, V> {
       return DataPage.deserializeDataPage(page.refId, page.data);
     }
 
-    throw new Error('Page ID not associated with metapage');
+    throw new Error('Attempting to load data page with incorrect page type');
   }
 
   private async loadMetadata(): Promise<MetaPage | undefined> {
@@ -415,8 +432,14 @@ export class BPlusTree<K, V> {
     if (result === undefined) {
       return result;
     }
-    this._metadata = cbor.decode(result) as MetaPage;
-    return this._metadata;
+
+    const page = await Page.deserializePage(result);
+
+    if (page.refType === PageType.Meta) {
+      return MetaPage.deserializeMetaPage(page.refId, page.data);
+    }
+
+    throw new Error('Attempting to load meta page with incorrect page type');
   }
 
   private async findLeaf(
@@ -458,8 +481,14 @@ export class BPlusTree<K, V> {
       throw new Error('Key is null');
     }
 
+    const newPageId = await this._idGenerator();
+    let newRootId;
+    if (path.length <= 0) {
+      newRootId = await this._idGenerator();
+    }
+
     const newPage: DataPage<K, V> = new DataPage(
-      this._idGenerator(),
+      newPageId,
       page.isLeaf,
       page.pointers.slice(midIndex),
       page.entries.slice(midIndex),
@@ -472,7 +501,7 @@ export class BPlusTree<K, V> {
       if (newPageChildId === undefined) {
         throw new Error('Trying to split empty internal page');
       }
-      const newPageChild = await this.loadPage(newPageChildId.pageId);
+      const newPageChild = await this.loadDataPage(newPageChildId.pageId);
       page.pointers.push({ key: null, pageId: newPageChild.id });
     }
 
@@ -488,8 +517,11 @@ export class BPlusTree<K, V> {
       const newPath = [...path].slice(0, path.length - 1);
       await this.storeDataPage(parent, newPath);
     } else {
+      if (newRootId === undefined) {
+        throw new Error('ID should be defined');
+      }
       this._root = new DataPage(
-        this._idGenerator(),
+        newRootId,
         false,
         [
           { key: midKey, pageId: page.id },

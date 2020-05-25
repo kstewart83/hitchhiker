@@ -29,6 +29,8 @@ export class MetaPage extends Page {
         str += `n${internalId} [label="Data"]\n`;
       } else if (internalId === memStor.IdMapMetadataId) {
         str += `n${internalId} [label="ID Map"]\n`;
+      } else if (internalId === memStor.FreeMapMetadataId) {
+        str += `n${internalId} [label="Free Map"]\n`;
       } else {
         str += `n${internalId} [label="M${this.id}:I${internalId}"]\n`;
       }
