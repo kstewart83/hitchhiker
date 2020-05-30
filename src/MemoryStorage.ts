@@ -1,8 +1,17 @@
-import { IStorage } from './Interfaces';
+import { IStorage, IStorageOptions } from './Interfaces';
 
 export class MemoryStorage implements IStorage {
-  public constructor() {
+  public constructor(maxNodeSize: number = 64, supportInternalDelete: boolean = false) {
     this._data = {};
+    this._maxNodeSize = maxNodeSize;
+    this._supportInternalDelete = supportInternalDelete;
+  }
+
+  options(): IStorageOptions {
+    return {
+      supportsInternalDelete: this._supportInternalDelete,
+      maxNodeSize: this._maxNodeSize,
+    };
   }
 
   *generator(count?: number) {
@@ -42,4 +51,6 @@ export class MemoryStorage implements IStorage {
   }
 
   private _data: { [key: number]: Buffer };
+  private _maxNodeSize: number;
+  private _supportInternalDelete: boolean;
 }

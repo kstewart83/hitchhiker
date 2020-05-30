@@ -1,16 +1,16 @@
-import { IStorageDriver } from './Interfaces';
+import { IStorage, IStorageOptions } from './Interfaces';
 import AWS from 'aws-sdk';
 import * as path from 'path';
 import dotenv from 'dotenv';
 
-export class DynamoStorage implements IStorageDriver {
+export class DynamoStorage implements IStorage {
   /*** PUBLIC ***/
 
   public readonly DataMetadataId = 0;
   public readonly TableName: string;
 
-  public constructor(tableName: string) {
-    this._maxNodeSize = 1024;
+  public constructor(tableName: string, maxNodeSize: number = 256) {
+    this._maxNodeSize = maxNodeSize;
     this.TableName = tableName;
     AWS.config.update({ region: 'us-east-1' });
     if (process.env.DYNAMODB_PROFILE === undefined) {
@@ -27,38 +27,11 @@ export class DynamoStorage implements IStorageDriver {
     this.ddb = new AWS.DynamoDB({ apiVersion: '2012-08-10' });
   }
 
-  maxPageSize(): number {
-    return this._maxNodeSize;
-  }
-
-  async getMetadata(): Promise<Buffer | undefined> {
-    const result = (
-      await this.ddb
-        .getItem({
-          TableName: this.TableName,
-          Key: {
-            Index: { S: this.DataMetadataId.toString() },
-          },
-        })
-        .promise()
-    ).Item?.Data.B;
-    if (result instanceof Buffer || result === undefined) {
-      return result;
-    } else {
-      throw new Error('Unknown return type');
-    }
-  }
-
-  async putMetadata(meta: Buffer): Promise<void> {
-    await this.ddb
-      .putItem({
-        TableName: this.TableName,
-        Item: {
-          Index: { S: this.DataMetadataId.toString() },
-          Data: { B: meta },
-        },
-      })
-      .promise();
+  options(): IStorageOptions {
+    return {
+      supportsInternalDelete: false,
+      maxNodeSize: this._maxNodeSize,
+    };
   }
 
   async get(id: number): Promise<Buffer | undefined> {
@@ -91,18 +64,7 @@ export class DynamoStorage implements IStorageDriver {
       .promise();
   }
 
-  async free(id: number): Promise<void> {
-    await this.ddb
-      .deleteItem({
-        TableName: this.TableName,
-        Key: {
-          Index: { S: id.toString() },
-        },
-      })
-      .promise();
-  }
-
-  generator(count?: number | undefined): Generator<{ key: number; buffer: Buffer }, boolean, number> {
+  *generator(count?: number | undefined): Generator<{ key: number; buffer: Buffer }, boolean, number> {
     throw new Error('Method not implemented.');
   }
 

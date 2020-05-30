@@ -17,12 +17,16 @@ export class DefaultStorageDriver implements IStorageDriver {
   public readonly IdMapMetadataId = 1;
   public readonly FreeMapMetadataId = 2;
 
-  public constructor(nodeSize: number = 64) {
-    this._maxNodeSize = nodeSize;
+  public constructor(storage?: IStorage) {
     this._nextId = 3;
     const that = this;
     this._pendingFreePageIds = [];
-    this._storage = new MemoryStorage();
+    this._data = {};
+    if (storage === undefined) {
+      this._storage = new MemoryStorage();
+    } else {
+      this._storage = storage;
+    }
 
     this._freeMapNextId = async (): Promise<number> => {
       return that._nextId++;
@@ -30,7 +34,7 @@ export class DefaultStorageDriver implements IStorageDriver {
 
     const internalFreeBTreeMethods = {
       maxPageSize() {
-        return that._maxNodeSize;
+        return that._storage.options().maxNodeSize;
       },
       async getMetadata() {
         return await that.getInternal(that.FreeMapMetadataId);
@@ -47,7 +51,9 @@ export class DefaultStorageDriver implements IStorageDriver {
       async free(id: number) {
         await that.freeInternal(id, id, TreeType.Free);
       },
-      generator(): Generator<
+      generator(
+        count?: number,
+      ): Generator<
         {
           key: number;
           buffer: Buffer;
@@ -55,7 +61,7 @@ export class DefaultStorageDriver implements IStorageDriver {
         boolean,
         number
       > {
-        return that.generator();
+        return that.generator(count);
       },
     };
 
@@ -72,7 +78,7 @@ export class DefaultStorageDriver implements IStorageDriver {
 
     const internalIdBTreeMethods = {
       maxPageSize() {
-        return that._maxNodeSize;
+        return that._storage.options().maxNodeSize;
       },
       async getMetadata() {
         return await that.getInternal(that.IdMapMetadataId);
@@ -89,7 +95,9 @@ export class DefaultStorageDriver implements IStorageDriver {
       async free(id: number): Promise<void> {
         await that.freeInternal(id, id, TreeType.Id);
       },
-      generator(): Generator<
+      generator(
+        count?: number,
+      ): Generator<
         {
           key: number;
           buffer: Buffer;
@@ -97,7 +105,7 @@ export class DefaultStorageDriver implements IStorageDriver {
         boolean,
         number
       > {
-        return that.generator();
+        return that.generator(count);
       },
     };
 
@@ -107,7 +115,7 @@ export class DefaultStorageDriver implements IStorageDriver {
   }
 
   maxPageSize(): number {
-    return this._maxNodeSize;
+    return this._storage.options().maxNodeSize;
   }
 
   async putMetadata(meta: Buffer): Promise<void> {
@@ -144,28 +152,18 @@ export class DefaultStorageDriver implements IStorageDriver {
     await this._extIdMap.delete(extId);
   }
 
-  *generator(count?: number) {
-    const gen = this._storage.generator(count);
-    let next = gen.next();
-    let i = 0;
-    while (!next.done) {
-      yield next.value;
-      if (count && i++ > count) {
-        return false;
-      }
-      next = gen.next();
-    }
-    return true;
+  generator(count?: number) {
+    return this._storage.generator(count);
   }
 
   /*** PRIVATE ***/
 
-  private readonly _maxNodeSize: number;
   private _nextId: number;
   private _extIdMap: BPlusTree<number, number>;
   private _freeMap: BPlusTree<number, number>;
   private _freeMapNextId: () => Promise<number>;
   private _pendingFreePageIds: number[];
+  private _data: any;
   private _storage: IStorage;
 
   private async getNextFreeId(context: TreeType): Promise<number> {
@@ -233,10 +231,12 @@ export class DefaultStorageDriver implements IStorageDriver {
 
   private async getInternal(id: number): Promise<Buffer | undefined> {
     return await this._storage.get(id);
+    // return this._data[id];
   }
 
   private async putInternal(id: number, ref: Buffer) {
     await this._storage.put(id, ref);
+    // this._data[id] = ref;
   }
 }
 

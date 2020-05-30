@@ -1,4 +1,4 @@
-import { IStorageDriver } from './Interfaces';
+import { IStorageDriver, IStorage } from './Interfaces';
 import { Page, PageType } from './Page';
 import { DataPage } from './DataPage';
 import { MetaPage } from './MetaPage';
@@ -18,14 +18,14 @@ export class BPlusTree<K, V> {
    * @param branching Branching factor for each page.
    * @param comparator Custom compartor for key values
    */
-  public constructor(storage?: IStorageDriver, idGenerator?: () => Promise<number>) {
+  public constructor(storageDriver?: IStorageDriver, idGenerator?: () => Promise<number>) {
     this._fillFactor = 4;
     this._root = undefined;
     this._metadata = undefined;
     this._setupComplete = false;
     this._operationPending = false;
-    if (storage) {
-      this._storage = storage;
+    if (storageDriver) {
+      this._storage = storageDriver;
     } else {
       this._storage = new DefaultStorageDriver();
     }

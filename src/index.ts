@@ -3,15 +3,17 @@ import BPlusTree from './BPlusTree';
 import PcgRandom from 'pcg-random';
 import { DynamoStorage } from './DynamoStorage';
 import DefaultStorageDriver from './DefaultStorageDriver';
+import { MemoryStorage } from './MemoryStorage';
 
 export default BPlusTree;
 export { BPlusTree };
 // tslint:disable: no-console
 
 async function main() {
-  const storage = new DynamoStorage('TestTable');
-  // const storage = new MemoryStorage();
-  const test = new BPlusTree<number, number>(storage);
+  // const storage = new DynamoStorage('TestTable');
+  const storage = new MemoryStorage(256);
+  const driver = new DefaultStorageDriver(storage);
+  const test = new BPlusTree<number, number>(driver);
   const entries: any = {};
   const total = 500;
   const timings: bigint[] = [];
@@ -28,7 +30,7 @@ async function main() {
     timings.push(process.hrtime.bigint());
   }
 
-  // let str = await test.toDOT();
+  let str = await test.toDOT();
 
   /*
 
@@ -83,7 +85,7 @@ async function main() {
     timings.push(process.hrtime.bigint());
   }
 
-  // str = await test.toDOT();
+  str = await test.toDOT();
   console.log((timings[timings.length - 1] - timings[0]) / BigInt(1));
   console.log((timings[timings.length - 1] - timings[0]) / BigInt(1000000));
 }

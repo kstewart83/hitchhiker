@@ -17,7 +17,13 @@ export interface IStorageDriver {
   >;
 }
 
+export interface IStorageOptions {
+  supportsInternalDelete: boolean;
+  maxNodeSize: number;
+}
+
 export interface IStorage {
+  options(): IStorageOptions;
   get(id: number): Promise<Buffer | undefined>;
   put(id: number, ref: Buffer): Promise<void>;
   generator(
