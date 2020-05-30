@@ -1,4 +1,3 @@
-import { IReferenceStorage } from './Interfaces';
 import * as cbor from 'cbor';
 
 export enum PageType {

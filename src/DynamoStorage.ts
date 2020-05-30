@@ -1,9 +1,9 @@
-import { IReferenceStorage } from './Interfaces';
+import { IStorageDriver } from './Interfaces';
 import AWS from 'aws-sdk';
 import * as path from 'path';
 import dotenv from 'dotenv';
 
-export class DynamoStorage implements IReferenceStorage {
+export class DynamoStorage implements IStorageDriver {
   /*** PUBLIC ***/
 
   public readonly DataMetadataId = 0;

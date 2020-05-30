@@ -1,7 +1,7 @@
 import Page, { PageType } from './Page';
 import * as cbor from 'cbor';
-import { IReferenceStorage } from './Interfaces';
-import MemoryStorage from './MemoryStorage';
+import { IStorageDriver } from './Interfaces';
+import DefaultStorageDriver from './DefaultStorageDriver';
 
 export class FreePage extends Page {
   detached: boolean;
@@ -21,15 +21,15 @@ export class FreePage extends Page {
     return new FreePage(id, data);
   }
 
-  async freePageToDOT(internalId: number, storage: IReferenceStorage): Promise<string> {
+  async freePageToDOT(internalId: number, storage: IStorageDriver): Promise<string> {
     let str = '';
     if (this.detached) {
       str += `n${internalId} [fillcolor="#ffaaff", style=filled, label="I${internalId}|D"]\n`;
     } else {
       str += `n${internalId} [fillcolor="#ffaa88", style=filled, label="I${internalId}"]\n`;
     }
-    if (storage instanceof MemoryStorage) {
-      const memStor = storage as MemoryStorage;
+    if (storage instanceof DefaultStorageDriver) {
+      const memStor = storage as DefaultStorageDriver;
       str += `n${memStor.FreeMapMetadataId} -> n${internalId}\n`;
     }
     return str;

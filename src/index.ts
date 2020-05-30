@@ -2,18 +2,18 @@
 import BPlusTree from './BPlusTree';
 import PcgRandom from 'pcg-random';
 import { DynamoStorage } from './DynamoStorage';
-import MemoryStorage from './MemoryStorage';
+import DefaultStorageDriver from './DefaultStorageDriver';
 
 export default BPlusTree;
 export { BPlusTree };
 // tslint:disable: no-console
 
 async function main() {
-  // const storage = new DynamoStorage('TestTable');
-  const storage = new MemoryStorage();
+  const storage = new DynamoStorage('TestTable');
+  // const storage = new MemoryStorage();
   const test = new BPlusTree<number, number>(storage);
   const entries: any = {};
-  const total = 150;
+  const total = 500;
   const timings: bigint[] = [];
   const rng = new PcgRandom(total);
   timings.push(process.hrtime.bigint());
@@ -28,7 +28,7 @@ async function main() {
     timings.push(process.hrtime.bigint());
   }
 
-  let str = await test.toDOT();
+  // let str = await test.toDOT();
 
   /*
 
@@ -62,16 +62,17 @@ async function main() {
       console.log('d = ', i);
     }
     if (result !== nextValue) {
+      console.log(result, ' !== ', nextValue);
       throw new Error();
     }
     timings.push(process.hrtime.bigint());
     delete entries[nextKey];
   }
 
-  str = await test.toDOT();
+  // str = await test.toDOT();
 
   for (let i = 0; i < total; i++) {
-    str = await test.toDOT();
+    // str = await test.toDOT();
     const k = rng.integer(total * 10);
     const v = rng.integer(total * 10);
     entries[k] = v;
@@ -82,7 +83,7 @@ async function main() {
     timings.push(process.hrtime.bigint());
   }
 
-  str = await test.toDOT();
+  // str = await test.toDOT();
   console.log((timings[timings.length - 1] - timings[0]) / BigInt(1));
   console.log((timings[timings.length - 1] - timings[0]) / BigInt(1000000));
 }

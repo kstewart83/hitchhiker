@@ -1,7 +1,7 @@
 import Page, { PageType } from './Page';
 import * as cbor from 'cbor';
-import { IReferenceStorage } from './Interfaces';
-import MemoryStorage from './MemoryStorage';
+import { IStorageDriver } from './Interfaces';
+import DefaultStorageDriver from './DefaultStorageDriver';
 
 export class MetaPage extends Page {
   rootId: number;
@@ -21,10 +21,10 @@ export class MetaPage extends Page {
     return new MetaPage(id, data);
   }
 
-  async metaPageToDOT(internalId: number, storage: IReferenceStorage): Promise<string> {
+  async metaPageToDOT(internalId: number, storage: IStorageDriver): Promise<string> {
     let str = `tree -> n${internalId}\n`;
-    if (storage instanceof MemoryStorage) {
-      const memStor = storage as MemoryStorage;
+    if (storage instanceof DefaultStorageDriver) {
+      const memStor = storage as DefaultStorageDriver;
       if (internalId === memStor.DataMetadataId) {
         str += `n${internalId} [label="Data"]\n`;
       } else if (internalId === memStor.IdMapMetadataId) {

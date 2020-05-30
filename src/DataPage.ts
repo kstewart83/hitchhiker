@@ -1,7 +1,16 @@
 import Page, { PageType } from './Page';
-import { Pointer, Entry } from './Interfaces';
 import * as cbor from 'cbor';
 import { SHA3 } from 'sha3';
+
+export interface Entry<K, V> {
+  key: K;
+  value?: V;
+}
+
+export interface Pointer<K> {
+  key: K | null;
+  pageId: number;
+}
 
 export class DataPage<K, V> extends Page {
   get isLeaf(): boolean {

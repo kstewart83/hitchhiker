@@ -1,9 +1,15 @@
-import { IReferenceStorage, PathElement } from './Interfaces';
+import { IStorageDriver } from './Interfaces';
 import { Page, PageType } from './Page';
 import { DataPage } from './DataPage';
 import { MetaPage } from './MetaPage';
-import MemoryStorage from './MemoryStorage';
+import DefaultStorageDriver from './DefaultStorageDriver';
 import { FreePage } from './FreePage';
+
+interface PathElement<K, V> {
+  page: DataPage<K, V>;
+  index: number;
+  found: boolean;
+}
 
 export class BPlusTree<K, V> {
   /*** PUBLIC ***/
@@ -12,7 +18,7 @@ export class BPlusTree<K, V> {
    * @param branching Branching factor for each page.
    * @param comparator Custom compartor for key values
    */
-  public constructor(storage?: IReferenceStorage, idGenerator?: () => Promise<number>) {
+  public constructor(storage?: IStorageDriver, idGenerator?: () => Promise<number>) {
     this._fillFactor = 4;
     this._root = undefined;
     this._metadata = undefined;
@@ -21,7 +27,7 @@ export class BPlusTree<K, V> {
     if (storage) {
       this._storage = storage;
     } else {
-      this._storage = new MemoryStorage();
+      this._storage = new DefaultStorageDriver();
     }
     this._maxPageSize = this._storage.maxPageSize();
     if (idGenerator === undefined) {
@@ -163,7 +169,7 @@ export class BPlusTree<K, V> {
   /**
    * Convert tree to DOT representation
    */
-  public static async toDOT(storage: IReferenceStorage): Promise<string> {
+  public static async toDOT(storage: IStorageDriver): Promise<string> {
     let str = '';
     const gen = storage.generator();
     let next = gen.next();
@@ -201,7 +207,7 @@ export class BPlusTree<K, V> {
 
   private _setupComplete: boolean;
   private _root: DataPage<K, V> | undefined;
-  private _storage: IReferenceStorage;
+  private _storage: IStorageDriver;
   private _metadata: MetaPage | undefined;
   private _idGenerator: () => Promise<number>;
   private readonly _fillFactor: number;
