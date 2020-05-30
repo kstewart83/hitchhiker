@@ -53,7 +53,7 @@ export class DefaultStorageDriver implements IStorageDriver {
       },
       generator(
         count?: number,
-      ): Generator<
+      ): AsyncGenerator<
         {
           key: number;
           buffer: Buffer;
@@ -97,7 +97,7 @@ export class DefaultStorageDriver implements IStorageDriver {
       },
       generator(
         count?: number,
-      ): Generator<
+      ): AsyncGenerator<
         {
           key: number;
           buffer: Buffer;
@@ -231,12 +231,10 @@ export class DefaultStorageDriver implements IStorageDriver {
 
   private async getInternal(id: number): Promise<Buffer | undefined> {
     return await this._storage.get(id);
-    // return this._data[id];
   }
 
   private async putInternal(id: number, ref: Buffer) {
     await this._storage.put(id, ref);
-    // this._data[id] = ref;
   }
 }
 

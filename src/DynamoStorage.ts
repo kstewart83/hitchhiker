@@ -2,6 +2,7 @@ import { IStorage, IStorageOptions } from './Interfaces';
 import AWS from 'aws-sdk';
 import * as path from 'path';
 import dotenv from 'dotenv';
+import { PromiseResult } from 'aws-sdk/lib/request';
 
 export class DynamoStorage implements IStorage {
   /*** PUBLIC ***/
@@ -9,7 +10,7 @@ export class DynamoStorage implements IStorage {
   public readonly DataMetadataId = 0;
   public readonly TableName: string;
 
-  public constructor(tableName: string, maxNodeSize: number = 256) {
+  public constructor(tableName: string, maxNodeSize: number = 512) {
     this._maxNodeSize = maxNodeSize;
     this.TableName = tableName;
     AWS.config.update({ region: 'us-east-1' });
@@ -64,8 +65,34 @@ export class DynamoStorage implements IStorage {
       .promise();
   }
 
-  *generator(count?: number | undefined): Generator<{ key: number; buffer: Buffer }, boolean, number> {
-    throw new Error('Method not implemented.');
+  async *generator(count?: number | undefined): AsyncGenerator<{ key: number; buffer: Buffer }, boolean, number> {
+    let result: PromiseResult<AWS.DynamoDB.ScanOutput, AWS.AWSError>;
+    do {
+      result = await this.ddb
+        .scan({
+          TableName: this.TableName,
+        })
+        .promise();
+
+      if (result.Items === undefined) {
+        throw new Error('DynamoDB did not return any results');
+      }
+
+      for (const item of result.Items) {
+        const keyAsString = item.Index.S;
+        const buffer = item.Data.B as Buffer;
+        if (keyAsString === undefined || buffer === undefined) {
+          throw new Error('DynamoDB returned an undefined key or buffer');
+        }
+        const key = parseInt(keyAsString, 10);
+        yield {
+          key,
+          buffer,
+        };
+      }
+    } while (result.LastEvaluatedKey !== undefined);
+
+    return true;
   }
 
   /*** PRIVATE ***/

@@ -172,7 +172,7 @@ export class BPlusTree<K, V> {
   public static async toDOT(storage: IStorageDriver): Promise<string> {
     let str = '';
     const gen = storage.generator();
-    let next = gen.next();
+    let next = await gen.next();
     while (!next.done) {
       const nextResult = next.value;
       const page = await Page.deserializePage(nextResult.buffer);
@@ -190,7 +190,7 @@ export class BPlusTree<K, V> {
         throw new Error('Unknown Page Type');
       }
 
-      next = gen.next();
+      next = await gen.next();
     }
 
     return str;

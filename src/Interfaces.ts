@@ -7,7 +7,7 @@ export interface IStorageDriver {
   free(id: number): Promise<void>;
   generator(
     count?: number,
-  ): Generator<
+  ): AsyncGenerator<
     {
       key: number;
       buffer: Buffer;
@@ -28,7 +28,7 @@ export interface IStorage {
   put(id: number, ref: Buffer): Promise<void>;
   generator(
     count?: number,
-  ): Generator<
+  ): AsyncGenerator<
     {
       key: number;
       buffer: Buffer;

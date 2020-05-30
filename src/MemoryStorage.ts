@@ -14,7 +14,7 @@ export class MemoryStorage implements IStorage {
     };
   }
 
-  *generator(count?: number) {
+  async *generator(count?: number) {
     function* entries(obj: { [key: number]: Buffer }) {
       for (const key of Object.keys(obj)) {
         const k = parseInt(key, 10);

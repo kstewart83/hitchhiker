@@ -11,7 +11,7 @@ export { BPlusTree };
 
 async function main() {
   // const storage = new DynamoStorage('TestTable');
-  const storage = new MemoryStorage(256);
+  const storage = new MemoryStorage();
   const driver = new DefaultStorageDriver(storage);
   const test = new BPlusTree<number, number>(driver);
   const entries: any = {};
@@ -71,7 +71,7 @@ async function main() {
     delete entries[nextKey];
   }
 
-  // str = await test.toDOT();
+  str = await test.toDOT();
 
   for (let i = 0; i < total; i++) {
     // str = await test.toDOT();
