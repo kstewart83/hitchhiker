@@ -39,3 +39,5 @@ This document tracks the goals and tasks for each major and minor release of thi
 `[ ][ ][ ][ ]` Use cryptographic hash of node contents as ID <br/>
 `[ ][ ][ ][ ]` Create custom Node encoder/decoders for CBOR processor <br/>
 `[ ][ ][ ][ ]` Transaction support <br/>
+`[ ][ ][ ][ ]` Calculate estimated serialized length without serialization <br/>
+`[ ][ ][ ][ ]` Move serialization of pages into storage driver <br/>
